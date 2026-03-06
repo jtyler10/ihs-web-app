@@ -1,0 +1,7 @@
+streamlit>=1.0
+SQLAlchemy>=1.4
+pymysql>=1.0
+requests>=2.25
+# optional for MARC / Z39.50:
+pymarc>=3.0   # for MARC parsing
+PyZ3950>=1.0  # optional; may require system libs

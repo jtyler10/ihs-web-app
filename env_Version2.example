@@ -1,0 +1,14 @@
+# Example environment variables for local development
+
+# MySQL container credentials (these match docker-compose.yml)
+DB_USER=ihs_user
+DB_PASS=ihs_pass
+DB_HOST=127.0.0.1
+DB_NAME=ihs_db
+
+# SQLAlchemy URL for the app (use this exactly when running the app)
+# Format: mysql+pymysql://<user>:<password>@<host>:<port>/<dbname>?charset=utf8mb4
+DATABASE_URL=mysql+pymysql://ihs_user:ihs_pass@127.0.0.1:3306/ihs_db?charset=utf8mb4
+
+# Only create tables when explicitly allowed (development only)
+ALLOW_CREATE_TABLES=1
