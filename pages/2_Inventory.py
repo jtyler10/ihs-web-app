@@ -236,7 +236,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                             _s = SessionLocal()
                             try:
                                 _s.execute(
-                                    sqlalchemy.text("INSERT INTO contributors (c_name, fname, c_lname) VALUES (:n, :f, :l)"),
+                                    sqlalchemy.text("INSERT INTO contributors (c_name, fname, c_lname, short_bio) VALUES (:n, :f, :l, '')"),
                                     {"n": e_manual_author, "f": fname, "l": lname},
                                 )
                                 _s.commit()

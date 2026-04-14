@@ -261,8 +261,8 @@ with col1:
                 try:
                     session.execute(
                         sqlalchemy.text(
-                            "INSERT INTO contributors (c_name, fname, c_lname) "
-                            "VALUES (:name, :fname, :lname)"
+                            "INSERT INTO contributors (c_name, fname, c_lname, short_bio) "
+                            "VALUES (:name, :fname, :lname, '')"
                         ),
                         {"name": manual_name, "fname": fname, "lname": lname},
                     )
