@@ -45,7 +45,7 @@ _IMPRINTS = [
     "The Schoolman Bookshelf",
 ]
 
-# ── Load contributors once per session ───────────────────────────────
+# ── Load contributors and publishers once per session ─────────────────
 if "_contributors" not in st.session_state:
     session = SessionLocal()
     try:
@@ -56,9 +56,20 @@ if "_contributors" not in st.session_state:
     finally:
         session.close()
 
+if "_publishers" not in st.session_state:
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            sqlalchemy.text("SELECT op_name FROM original_publishers ORDER BY op_name")
+        )
+        st.session_state["_publishers"] = [row[0] for row in rows if row[0]]
+    finally:
+        session.close()
+
 _DEFAULTS = {
     "f_title": "", "f_author_select": _MANUAL, "f_authors": "",
-    "f_isbn": "", "f_publisher": "", "f_pub_year": "", "f_pages": 0,
+    "f_publisher_select": _MANUAL, "f_publisher": "",
+    "f_isbn": "", "f_pub_year": "", "f_pages": 0,
     "f_language": "", "f_description": "",
     "f_condition": "Good", "f_scanned": False, "f_owner": _OWNERS[0],
     "f_priority": "Medium", "f_potential_imprint": _IMPRINTS[0], "f_notes": "",
@@ -72,10 +83,21 @@ if st.session_state.pop("_do_clear", False):
 
 prefill = st.session_state.pop("_prefill", None)
 if prefill:
-    st.session_state["f_title"]     = prefill.get("title") or ""
-    st.session_state["f_isbn"]      = prefill.get("isbn") or ""
-    st.session_state["f_publisher"] = prefill.get("publisher") or ""
-    st.session_state["f_pub_year"]  = prefill.get("pub_year") or ""
+    st.session_state["f_title"]    = prefill.get("title") or ""
+    st.session_state["f_isbn"]     = prefill.get("isbn") or ""
+    st.session_state["f_pub_year"] = prefill.get("pub_year") or ""
+    # Try to match incoming publisher to the original_publishers table
+    incoming_pub = (prefill.get("publisher") or "").strip().lower()
+    pub_match = next(
+        (p for p in st.session_state["_publishers"]
+         if incoming_pub and (incoming_pub in p.lower() or p.lower() in incoming_pub)),
+        None,
+    )
+    if pub_match:
+        st.session_state["f_publisher_select"] = pub_match
+    else:
+        st.session_state["f_publisher_select"] = _MANUAL
+        st.session_state["f_publisher"] = prefill.get("publisher") or ""
     st.session_state["f_language"]  = prefill.get("language") or ""
     if prefill.get("pages"):
         st.session_state["f_pages"] = int(prefill["pages"])
@@ -254,7 +276,42 @@ with col1:
                     session.close()
 
     st.text_input("ISBN", key="f_isbn")
-    st.text_input("Publisher", key="f_publisher")
+
+    # Publisher — original_publishers dropdown with manual fallback
+    publishers = st.session_state.get("_publishers", [])
+    pub_opts = [_MANUAL] + publishers
+    if st.session_state.get("f_publisher_select") not in pub_opts:
+        st.session_state["f_publisher_select"] = _MANUAL
+    st.selectbox("Publisher", pub_opts, key="f_publisher_select")
+    if st.session_state["f_publisher_select"] == _MANUAL:
+        st.text_input("Type publisher name", key="f_publisher")
+        manual_pub = st.session_state.get("f_publisher", "").strip()
+        if manual_pub and manual_pub not in st.session_state["_publishers"]:
+            if st.button(f'Add "{manual_pub}" to publishers list'):
+                session = SessionLocal()
+                try:
+                    session.execute(
+                        sqlalchemy.text(
+                            "INSERT INTO original_publishers (op_name) VALUES (:name)"
+                        ),
+                        {"name": manual_pub},
+                    )
+                    session.commit()
+                    rows = session.execute(
+                        sqlalchemy.text(
+                            "SELECT op_name FROM original_publishers ORDER BY op_name"
+                        )
+                    )
+                    st.session_state["_publishers"] = [r[0] for r in rows if r[0]]
+                    st.session_state["f_publisher_select"] = manual_pub
+                    st.success(f'Added "{manual_pub}" to publishers.')
+                    st.experimental_rerun()
+                except Exception as e:
+                    session.rollback()
+                    st.error(f"Could not add publisher: {e}")
+                finally:
+                    session.close()
+
     st.text_input("Publication Year", key="f_pub_year")
 
 with col2:
@@ -275,11 +332,16 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
     if not title_val:
         st.error("Title is required.")
     else:
-        # Resolve authors: contributor selection or manual entry
+        # Resolve authors and publisher
         if st.session_state.f_author_select == _MANUAL:
             authors_val = st.session_state.get("f_authors", "").strip() or None
         else:
             authors_val = st.session_state.f_author_select
+
+        if st.session_state.f_publisher_select == _MANUAL:
+            publisher_val = st.session_state.get("f_publisher", "").strip() or None
+        else:
+            publisher_val = st.session_state.f_publisher_select
 
         session = SessionLocal()
         try:
@@ -287,7 +349,7 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
                 title=title_val,
                 authors=authors_val,
                 isbn=st.session_state.f_isbn.strip() or None,
-                publisher=st.session_state.f_publisher.strip() or None,
+                publisher=publisher_val,
                 pub_year=st.session_state.f_pub_year.strip() or None,
                 pages=int(st.session_state.f_pages) if st.session_state.f_pages else None,
                 language=st.session_state.f_language.strip() or None,
