@@ -81,6 +81,14 @@ if st.session_state.pop("_do_clear", False):
     for k, v in _DEFAULTS.items():
         st.session_state[k] = v
 
+new_pub = st.session_state.pop("_set_publisher_select", None)
+if new_pub:
+    st.session_state["f_publisher_select"] = new_pub
+
+new_author = st.session_state.pop("_set_author_select", None)
+if new_author:
+    st.session_state["f_author_select"] = new_author
+
 prefill = st.session_state.pop("_prefill", None)
 if prefill:
     st.session_state["f_title"]    = prefill.get("title") or ""
@@ -266,7 +274,7 @@ with col1:
                         )
                     )
                     st.session_state["_contributors"] = [r[0] for r in rows if r[0]]
-                    st.session_state["f_author_select"] = manual_name
+                    st.session_state["_set_author_select"] = manual_name
                     st.success(f'Added "{manual_name}" to contributors.')
                     st.experimental_rerun()
                 except Exception as e:
@@ -303,7 +311,7 @@ with col1:
                         )
                     )
                     st.session_state["_publishers"] = [r[0] for r in rows if r[0]]
-                    st.session_state["f_publisher_select"] = manual_pub
+                    st.session_state["_set_publisher_select"] = manual_pub
                     st.success(f'Added "{manual_pub}" to publishers.')
                     st.experimental_rerun()
                 except Exception as e:
