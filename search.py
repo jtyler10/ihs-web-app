@@ -1,7 +1,7 @@
 import re
 import requests
 
-_TIMEOUT = 30  # seconds
+_TIMEOUT = 120  # seconds
 
 
 def _parse_docs(docs):
