@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import sqlalchemy
 import streamlit as st
 from db import SessionLocal
-from models import Book
+from models import Book, Production
 from search import (
     search_openlibrary_by_title,
     search_openlibrary_by_author,
@@ -73,6 +73,7 @@ _DEFAULTS = {
     "f_language": "", "f_description": "",
     "f_condition": "Good", "f_scanned": False, "f_owner": _OWNERS[0],
     "f_priority": "Medium", "f_potential_imprint": _IMPRINTS[0], "f_notes": "",
+    "f_add_to_pipeline": False,
     "_search_results": [],
 }
 
@@ -335,6 +336,8 @@ st.text_area("Description", key="f_description", height=80)
 st.text_area("Notes", key="f_notes", height=80)
 
 st.markdown("---")
+st.checkbox("Add to Production Pipeline", key="f_add_to_pipeline")
+
 if st.button("Save to Inventory", type="primary", use_container_width=True):
     title_val = st.session_state.f_title.strip()
     if not title_val:
@@ -350,6 +353,14 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
             publisher_val = st.session_state.get("f_publisher", "").strip() or None
         else:
             publisher_val = st.session_state.f_publisher_select
+
+        # Determine pipeline stage
+        if st.session_state.f_owner == "Acquisitions":
+            pipeline_stage = "Acquisitions"
+        elif st.session_state.f_scanned:
+            pipeline_stage = "Transcription"
+        else:
+            pipeline_stage = "In Hand"
 
         session = SessionLocal()
         try:
@@ -371,8 +382,17 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
                 source="web-form",
             )
             session.add(new_book)
+            session.flush()  # get new_book.id before commit
+
+            if st.session_state.f_add_to_pipeline:
+                session.add(Production(
+                    book_id=new_book.id,
+                    stage=pipeline_stage,
+                ))
+
             session.commit()
-            st.success(f"Saved **{new_book.title}** (id={new_book.id})")
+            pipeline_msg = f" → added to pipeline at **{pipeline_stage}**" if st.session_state.f_add_to_pipeline else ""
+            st.success(f"Saved **{new_book.title}**{pipeline_msg}")
             st.session_state["_do_clear"] = True
             st.rerun()
         except Exception as e:
