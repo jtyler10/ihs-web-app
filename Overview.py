@@ -4,7 +4,8 @@ from sqlalchemy import func
 from db import SessionLocal, engine, Base
 from models import Book
 
-if os.getenv("ALLOW_CREATE_TABLES") == "1":
+_allow_create = os.getenv("ALLOW_CREATE_TABLES") or st.secrets.get("ALLOW_CREATE_TABLES", "0")
+if _allow_create == "1":
     Base.metadata.create_all(bind=engine)
 
 st.set_page_config(page_title="IHS Inventory", layout="wide", page_icon="📚")
