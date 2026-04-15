@@ -17,7 +17,7 @@ st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
 st.title("Add Book to Inventory")
 
 _MANUAL = "— Type name manually —"
-_OWNERS = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler"]
+_OWNERS = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler", "Acquisitions"]
 
 _IMPRINTS = [
     "",
@@ -233,7 +233,7 @@ with st.expander("Search Open Library to autofill", expanded=True):
         if st.button("Autofill from this edition", use_container_width=True):
             st.session_state["_prefill"] = results[chosen]
             st.session_state["_search_results"] = []
-            st.experimental_rerun()
+            st.rerun()
 
 st.markdown("---")
 st.subheader("Book Details")
@@ -276,7 +276,7 @@ with col1:
                     st.session_state["_contributors"] = [r[0] for r in rows if r[0]]
                     st.session_state["_set_author_select"] = manual_name
                     st.success(f'Added "{manual_name}" to contributors.')
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     session.rollback()
                     st.error(f"Could not add contributor: {e}")
@@ -313,7 +313,7 @@ with col1:
                     st.session_state["_publishers"] = [r[0] for r in rows if r[0]]
                     st.session_state["_set_publisher_select"] = manual_pub
                     st.success(f'Added "{manual_pub}" to publishers.')
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     session.rollback()
                     st.error(f"Could not add publisher: {e}")
@@ -374,7 +374,7 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
             session.commit()
             st.success(f"Saved **{new_book.title}** (id={new_book.id})")
             st.session_state["_do_clear"] = True
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             session.rollback()
             st.error(f"Error saving: {e}")

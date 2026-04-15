@@ -10,7 +10,7 @@ from models import Book
 
 # ── Constants (mirrors Add Book page) ────────────────────────────────
 _MANUAL  = "— Type name manually —"
-_OWNERS  = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler"]
+_OWNERS  = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler", "Acquisitions"]
 _IMPRINTS = [
     "",
     "IHS Press", "Nota Tomus Gregoriana", "HarperCollins",
@@ -209,7 +209,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
         )
         if st.button("Load for editing", use_container_width=True):
             st.session_state["_load_edit_id"] = edit_select_id
-            st.experimental_rerun()
+            st.rerun()
 
         if st.session_state["_editing_id"] is not None:
             eid = st.session_state["_editing_id"]
@@ -243,7 +243,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                                 _r = _s.execute(sqlalchemy.text("SELECT c_name FROM contributors ORDER BY c_lname, fname"))
                                 st.session_state["_contributors"] = [r[0] for r in _r if r[0]]
                                 st.session_state["_set_edit_author_select"] = e_manual_author
-                                st.experimental_rerun()
+                                st.rerun()
                             except Exception as e:
                                 _s.rollback()
                                 st.error(f"Could not add contributor: {e}")
@@ -272,7 +272,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                                 _r = _s.execute(sqlalchemy.text("SELECT op_name FROM original_publishers ORDER BY op_name"))
                                 st.session_state["_publishers"] = [r[0] for r in _r if r[0]]
                                 st.session_state["_set_edit_publisher_select"] = e_manual_pub
-                                st.experimental_rerun()
+                                st.rerun()
                             except Exception as e:
                                 _s.rollback()
                                 st.error(f"Could not add publisher: {e}")
@@ -332,7 +332,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                                 _s.commit()
                                 st.success(f"Updated **{b.title}** (id={eid})")
                                 st.session_state["_editing_id"] = None
-                                st.experimental_rerun()
+                                st.rerun()
                         except Exception as e:
                             _s.rollback()
                             st.error(f"Error saving: {e}")
@@ -341,7 +341,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
             with sv2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state["_editing_id"] = None
-                    st.experimental_rerun()
+                    st.rerun()
 
 # ── Remove a Book ──────────────────────────────────────────────────────
 st.markdown("---")
@@ -361,7 +361,7 @@ with st.expander("Remove a Book from Inventory"):
         if st.session_state["delete_pending_id"] != selected_id:
             if st.button("Remove this book", use_container_width=True):
                 st.session_state["delete_pending_id"] = selected_id
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.warning(
                 f"Are you sure you want to permanently remove "
@@ -379,7 +379,7 @@ with st.expander("Remove a Book from Inventory"):
                             _s.commit()
                             st.success(f"Removed **{b.title}** from inventory.")
                         st.session_state["delete_pending_id"] = None
-                        st.experimental_rerun()
+                        st.rerun()
                     except Exception as e:
                         _s.rollback()
                         st.error(f"Error removing book: {e}")
@@ -388,4 +388,4 @@ with st.expander("Remove a Book from Inventory"):
             with c2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state["delete_pending_id"] = None
-                    st.experimental_rerun()
+                    st.rerun()

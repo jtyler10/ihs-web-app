@@ -23,3 +23,14 @@ class Book(Base):
     notes = Column(Text)
     source = Column(String(64))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Production(Base):
+    __tablename__ = "production"
+
+    id          = Column(Integer, primary_key=True)
+    book_id     = Column(Integer, nullable=False, index=True)
+    stage       = Column(String(64), nullable=False)
+    assigned_to = Column(String(256))
+    notes       = Column(Text)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
