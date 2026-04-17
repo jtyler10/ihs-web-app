@@ -60,15 +60,17 @@ if "_publishers" not in st.session_state:
     session = SessionLocal()
     try:
         rows = session.execute(
-            sqlalchemy.text("SELECT op_name FROM original_publishers ORDER BY op_name")
+            sqlalchemy.text("SELECT op_name, op_city FROM original_publishers ORDER BY op_name")
         )
-        st.session_state["_publishers"] = [row[0] for row in rows if row[0]]
+        data = [(r[0], r[1] or "") for r in rows if r[0]]
+        st.session_state["_publishers"] = [d[0] for d in data]
+        st.session_state["_publisher_cities"] = {d[0]: d[1] for d in data}
     finally:
         session.close()
 
 _DEFAULTS = {
     "f_title": "", "f_author_select": _MANUAL, "f_authors": "",
-    "f_publisher_select": _MANUAL, "f_publisher": "",
+    "f_publisher_select": _MANUAL, "f_publisher": "", "f_publisher_city": "",
     "f_isbn": "", "f_pub_year": "", "f_pages": 0,
     "f_language": "", "f_description": "",
     "f_condition": "Good", "f_scanned": False, "f_owner": _OWNERS[0],
@@ -104,9 +106,11 @@ if prefill:
     )
     if pub_match:
         st.session_state["f_publisher_select"] = pub_match
+        st.session_state["f_publisher_city"] = st.session_state.get("_publisher_cities", {}).get(pub_match, "")
     else:
         st.session_state["f_publisher_select"] = _MANUAL
         st.session_state["f_publisher"] = prefill.get("publisher") or ""
+        st.session_state["f_publisher_city"] = prefill.get("publish_place") or ""
     st.session_state["f_language"]  = prefill.get("language") or ""
     if prefill.get("pages"):
         st.session_state["f_pages"] = int(prefill["pages"])
@@ -291,7 +295,13 @@ with col1:
     pub_opts = [_MANUAL] + publishers
     if st.session_state.get("f_publisher_select") not in pub_opts:
         st.session_state["f_publisher_select"] = _MANUAL
-    st.selectbox("Publisher", pub_opts, key="f_publisher_select")
+
+    def _on_pub_change():
+        sel = st.session_state.get("f_publisher_select")
+        if sel and sel != _MANUAL:
+            st.session_state["f_publisher_city"] = st.session_state.get("_publisher_cities", {}).get(sel, "")
+
+    st.selectbox("Publisher", pub_opts, key="f_publisher_select", on_change=_on_pub_change)
     if st.session_state["f_publisher_select"] == _MANUAL:
         st.text_input("Type publisher name", key="f_publisher")
         manual_pub = st.session_state.get("f_publisher", "").strip()
@@ -308,10 +318,12 @@ with col1:
                     session.commit()
                     rows = session.execute(
                         sqlalchemy.text(
-                            "SELECT op_name FROM original_publishers ORDER BY op_name"
+                            "SELECT op_name, op_city FROM original_publishers ORDER BY op_name"
                         )
                     )
-                    st.session_state["_publishers"] = [r[0] for r in rows if r[0]]
+                    data = [(r[0], r[1] or "") for r in rows if r[0]]
+                    st.session_state["_publishers"] = [d[0] for d in data]
+                    st.session_state["_publisher_cities"] = {d[0]: d[1] for d in data}
                     st.session_state["_set_publisher_select"] = manual_pub
                     st.success(f'Added "{manual_pub}" to publishers.')
                     st.rerun()
@@ -321,6 +333,7 @@ with col1:
                 finally:
                     session.close()
 
+    st.text_input("Publisher City", key="f_publisher_city")
     st.text_input("Publication Year", key="f_pub_year")
 
 with col2:
@@ -369,6 +382,7 @@ if st.button("Save to Inventory", type="primary", use_container_width=True):
                 authors=authors_val,
                 isbn=st.session_state.f_isbn.strip() or None,
                 publisher=publisher_val,
+                publisher_city=st.session_state.f_publisher_city.strip() or None,
                 pub_year=st.session_state.f_pub_year.strip() or None,
                 pages=int(st.session_state.f_pages) if st.session_state.f_pages else None,
                 language=st.session_state.f_language.strip() or None,

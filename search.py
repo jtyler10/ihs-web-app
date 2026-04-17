@@ -77,6 +77,7 @@ def search_openlibrary_by_isbn(isbn):
     pub_date = d.get("publish_date", "") or ""
     year_match = re.search(r"\b(\d{4})\b", pub_date)
     publishers = [p.get("name", "") for p in d.get("publishers", []) if p.get("name")]
+    places = [p.get("name", "") for p in d.get("publish_places", []) if p.get("name")]
     return {
         "title": d.get("title"),
         "authors": ", ".join(a.get("name", "") for a in d.get("authors", [])) or None,
@@ -84,6 +85,7 @@ def search_openlibrary_by_isbn(isbn):
         "all_isbns": [isbn_clean],
         "publisher": publishers[0] if publishers else None,
         "all_publishers": publishers,
+        "publish_place": places[0] if places else None,
         "pub_year": year_match.group(1) if year_match else (pub_date or None),
         "pages": d.get("number_of_pages"),
         "language": None,

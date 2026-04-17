@@ -24,9 +24,16 @@ STAGES = [
     "In Hand",
     "Scanning",
     "Transcription",
-    "Layout",
-    "Review",
+    "Text Editing",
+    "Rights & Permissions",
+    "Preface & Front Matter",
+    "Cover & Art",
+    "CIP",
+    "Typesetting",
+    "Proof",
     "Print Ready",
+    "Printing",
+    "Marketing",
     "Published",
 ]
 

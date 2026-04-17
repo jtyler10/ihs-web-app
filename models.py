@@ -11,6 +11,7 @@ class Book(Base):
     authors = Column(String(512))
     isbn = Column(String(32), index=True)
     publisher = Column(String(256))
+    publisher_city = Column(String(256))
     pub_year = Column(String(10))
     description = Column(Text)
     pages = Column(Integer)

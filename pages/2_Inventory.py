@@ -45,8 +45,10 @@ if "_contributors" not in st.session_state:
 if "_publishers" not in st.session_state:
     _s = SessionLocal()
     try:
-        _r = _s.execute(sqlalchemy.text("SELECT op_name FROM original_publishers ORDER BY op_name"))
-        st.session_state["_publishers"] = [r[0] for r in _r if r[0]]
+        _r = _s.execute(sqlalchemy.text("SELECT op_name, op_city FROM original_publishers ORDER BY op_name"))
+        data = [(r[0], r[1] or "") for r in _r if r[0]]
+        st.session_state["_publishers"] = [d[0] for d in data]
+        st.session_state["_publisher_cities"] = {d[0]: d[1] for d in data}
     finally:
         _s.close()
 
@@ -79,9 +81,11 @@ if load_id:
             # Publisher
             if b.publisher in st.session_state["_publishers"]:
                 st.session_state["e_publisher_select"] = b.publisher
+                st.session_state["e_publisher_city"]   = st.session_state.get("_publisher_cities", {}).get(b.publisher, b.publisher_city or "")
             else:
                 st.session_state["e_publisher_select"] = _MANUAL
                 st.session_state["e_publisher"]        = b.publisher or ""
+                st.session_state["e_publisher_city"]   = b.publisher_city or ""
     finally:
         _s.close()
 
@@ -113,6 +117,7 @@ df = pd.DataFrame([{
     "Authors": b.authors or "",
     "ISBN": b.isbn or "",
     "Publisher": b.publisher or "",
+    "Publisher City": b.publisher_city or "",
     "Year": b.pub_year or "",
     "Condition": b.condition or "",
     "Scanned": bool(b.scanned),
@@ -256,7 +261,13 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                 pub_opts = [_MANUAL] + st.session_state["_publishers"]
                 if st.session_state.get("e_publisher_select") not in pub_opts:
                     st.session_state["e_publisher_select"] = _MANUAL
-                st.selectbox("Publisher", pub_opts, key="e_publisher_select")
+
+                def _on_edit_pub_change():
+                    sel = st.session_state.get("e_publisher_select")
+                    if sel and sel != _MANUAL:
+                        st.session_state["e_publisher_city"] = st.session_state.get("_publisher_cities", {}).get(sel, "")
+
+                st.selectbox("Publisher", pub_opts, key="e_publisher_select", on_change=_on_edit_pub_change)
                 if st.session_state["e_publisher_select"] == _MANUAL:
                     st.text_input("Type publisher name", key="e_publisher")
                     e_manual_pub = st.session_state.get("e_publisher", "").strip()
@@ -269,8 +280,10 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                                     {"n": e_manual_pub},
                                 )
                                 _s.commit()
-                                _r = _s.execute(sqlalchemy.text("SELECT op_name FROM original_publishers ORDER BY op_name"))
-                                st.session_state["_publishers"] = [r[0] for r in _r if r[0]]
+                                _r = _s.execute(sqlalchemy.text("SELECT op_name, op_city FROM original_publishers ORDER BY op_name"))
+                                data = [(r[0], r[1] or "") for r in _r if r[0]]
+                                st.session_state["_publishers"] = [d[0] for d in data]
+                                st.session_state["_publisher_cities"] = {d[0]: d[1] for d in data}
                                 st.session_state["_set_edit_publisher_select"] = e_manual_pub
                                 st.rerun()
                             except Exception as e:
@@ -279,6 +292,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                             finally:
                                 _s.close()
 
+                st.text_input("Publisher City", key="e_publisher_city")
                 st.text_input("Publication Year", key="e_pub_year")
 
             with ec2:
@@ -319,6 +333,7 @@ with st.expander("Edit a Book", expanded=st.session_state["_editing_id"] is not 
                                 b.authors           = e_authors
                                 b.isbn              = st.session_state.e_isbn.strip() or None
                                 b.publisher         = e_publisher
+                                b.publisher_city    = st.session_state.e_publisher_city.strip() or None
                                 b.pub_year          = st.session_state.e_pub_year.strip() or None
                                 b.pages             = int(st.session_state.e_pages) if st.session_state.e_pages else None
                                 b.language          = st.session_state.e_language.strip() or None
