@@ -6,3 +6,5 @@ python-dotenv>=1.0
 pandas>=2.0
 cryptography>=41.0
 pymupdf>=1.22
+pytesseract>=0.3
+pillow>=9.0
