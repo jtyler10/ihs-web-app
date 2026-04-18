@@ -29,7 +29,7 @@ STAGES = [
 ]
 TERMINAL = "Published"
 ALL_STAGES = STAGES + [TERMINAL]
-_PEOPLE = ["", "John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler"]
+_PEOPLE = ["", "John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler", "Aaron Carroll"]
 
 
 # ── Deferred operations (must run before any widgets) ────────────────

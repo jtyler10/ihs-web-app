@@ -17,7 +17,7 @@ st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
 st.title("Add Book to Inventory")
 
 _MANUAL = "— Type name manually —"
-_OWNERS = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler", "Acquisitions"]
+_OWNERS = ["John Sharpe", "Jacob Hamm", "John Joyce", "Jonathan Tyler", "Aaron Carroll", "Acquisitions"]
 
 _IMPRINTS = [
     "",
