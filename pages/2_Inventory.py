@@ -200,10 +200,10 @@ with tab_table:
         c4.write(row["Year"] or "—")
         c5.write(row["Owner"] or "—")
         c6.write(row["Condition"] or "—")
-        if c7.button("✏️", key=f"edit_{row['ID']}", help="Edit"):
+        if c7.button("✏️", key=f"edit_{row['ID']}", help="Edit", use_container_width=True):
             st.session_state["_load_edit_id"] = row["ID"]
             st.rerun()
-        if c8.button("🗑️", key=f"del_{row['ID']}", help="Delete"):
+        if c8.button("🗑️", key=f"del_{row['ID']}", help="Delete", use_container_width=True):
             st.session_state["delete_pending_id"] = row["ID"]
             st.rerun()
 
