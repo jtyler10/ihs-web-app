@@ -11,6 +11,15 @@ from search import (
     search_openlibrary_by_author,
     search_openlibrary_advanced,
     search_openlibrary_by_isbn,
+    search_loc_by_title,
+    search_loc_by_author,
+    search_loc_advanced,
+    search_loc_by_isbn,
+    search_worldcat_by_title,
+    search_worldcat_by_author,
+    search_worldcat_advanced,
+    search_worldcat_by_isbn,
+    worldcat_available,
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
@@ -131,8 +140,24 @@ for k, v in _DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Open Library Search ───────────────────────────────────────────────
-with st.expander("Search Open Library to autofill", expanded=True):
+# ── Catalog Search ────────────────────────────────────────────────────
+with st.expander("Search catalogs to autofill", expanded=True):
+    # Source selection
+    _wc_ok = worldcat_available()
+    src_col, _ = st.columns([2, 1])
+    with src_col:
+        selected_sources = st.multiselect(
+            "Search in",
+            options=["Library of Congress", "Open Library", "WorldCat"],
+            default=["Library of Congress", "Open Library"],
+            key="s_sources",
+        )
+    if "WorldCat" in selected_sources and not _wc_ok:
+        st.info(
+            "WorldCat requires `OCLC_CLIENT_ID` and `OCLC_CLIENT_SECRET` "
+            "environment variables to be set."
+        )
+
     s_type = st.radio(
         "Search by",
         ["Title", "Author", "ISBN", "Title + Author"],
@@ -147,50 +172,78 @@ with st.expander("Search Open Library to autofill", expanded=True):
         st.text_input("ISBN", placeholder="Enter ISBN…", key="s_isbn")
 
     if st.button("Search", use_container_width=True):
-        # Clear old per-result checkbox states
         for i in range(len(st.session_state.get("_search_results", []))):
             st.session_state.pop(f"chk_{i}", None)
 
-        with st.spinner("Searching Open Library…"):
-            try:
-                if s_type == "Title":
-                    q = st.session_state.get("s_title", "").strip()
-                    if not q:
-                        st.warning("Enter a title.")
-                    else:
-                        st.session_state["_search_results"] = search_openlibrary_by_title(q)
+        qt = st.session_state.get("s_title", "").strip()
+        qa = st.session_state.get("s_author", "").strip()
+        qi = st.session_state.get("s_isbn", "").strip()
 
-                elif s_type == "Author":
-                    q = st.session_state.get("s_author", "").strip()
-                    if not q:
-                        st.warning("Enter an author.")
-                    else:
-                        st.session_state["_search_results"] = search_openlibrary_by_author(q)
+        missing = False
+        if s_type == "Title" and not qt:
+            st.warning("Enter a title.")
+            missing = True
+        elif s_type == "Author" and not qa:
+            st.warning("Enter an author.")
+            missing = True
+        elif s_type == "ISBN" and not qi:
+            st.warning("Enter an ISBN.")
+            missing = True
+        elif s_type == "Title + Author" and not qt and not qa:
+            st.warning("Enter a title and/or author.")
+            missing = True
 
-                elif s_type == "ISBN":
-                    q = st.session_state.get("s_isbn", "").strip()
-                    if not q:
-                        st.warning("Enter an ISBN.")
-                    else:
-                        result = search_openlibrary_by_isbn(q)
-                        st.session_state["_search_results"] = [result] if result else []
+        if not missing:
+            active = [s for s in selected_sources if s != "WorldCat" or _wc_ok]
+            if not active:
+                st.warning("Select at least one search source.")
+            else:
+                with st.spinner(f"Searching {', '.join(active)}…"):
+                    all_results = []
+                    for source in active:
+                        try:
+                            if source == "Open Library":
+                                if s_type == "Title":
+                                    all_results += search_openlibrary_by_title(qt)
+                                elif s_type == "Author":
+                                    all_results += search_openlibrary_by_author(qa)
+                                elif s_type == "ISBN":
+                                    r = search_openlibrary_by_isbn(qi)
+                                    if r:
+                                        all_results.append(r)
+                                else:
+                                    all_results += search_openlibrary_advanced(title=qt, author=qa)
 
-                elif s_type == "Title + Author":
-                    qt = st.session_state.get("s_title", "").strip()
-                    qa = st.session_state.get("s_author", "").strip()
-                    if not qt and not qa:
-                        st.warning("Enter a title and/or author.")
-                    else:
-                        st.session_state["_search_results"] = search_openlibrary_advanced(
-                            title=qt, author=qa
-                        )
+                            elif source == "Library of Congress":
+                                if s_type == "Title":
+                                    all_results += search_loc_by_title(qt)
+                                elif s_type == "Author":
+                                    all_results += search_loc_by_author(qa)
+                                elif s_type == "ISBN":
+                                    r = search_loc_by_isbn(qi)
+                                    if r:
+                                        all_results.append(r)
+                                else:
+                                    all_results += search_loc_advanced(title=qt, author=qa)
 
-                if st.session_state["_search_results"] == []:
-                    st.info("No results found. Fill in the form below manually.")
+                            elif source == "WorldCat":
+                                if s_type == "Title":
+                                    all_results += search_worldcat_by_title(qt)
+                                elif s_type == "Author":
+                                    all_results += search_worldcat_by_author(qa)
+                                elif s_type == "ISBN":
+                                    r = search_worldcat_by_isbn(qi)
+                                    if r:
+                                        all_results.append(r)
+                                else:
+                                    all_results += search_worldcat_advanced(title=qt, author=qa)
 
-            except Exception as e:
-                st.error(f"Search error: {e}")
-                st.session_state["_search_results"] = []
+                        except Exception as src_err:
+                            st.warning(f"{source} search failed: {src_err}")
+
+                    st.session_state["_search_results"] = all_results
+                    if not all_results:
+                        st.info("No results found. Fill in the form below manually.")
 
     # ── Results: reference table + edition picker ─────────────────────
     if st.session_state["_search_results"]:
@@ -198,15 +251,14 @@ with st.expander("Search Open Library to autofill", expanded=True):
 
         results = st.session_state["_search_results"]
 
-        # Build a flat reference table — one row per edition
         rows = []
         for r in results:
             isbns = r.get("all_isbns") or ([r["isbn"]] if r.get("isbn") else ["—"])
             pubs  = r.get("all_publishers") or ([r["publisher"]] if r.get("publisher") else ["—"])
-            # Cross all ISBNs with all publishers for this result
             for isbn in (isbns or ["—"]):
                 for pub in (pubs or ["—"]):
                     rows.append({
+                        "Source":    r.get("source") or "—",
                         "Title":     r.get("title") or "—",
                         "Authors":   r.get("authors") or "—",
                         "Year":      r.get("pub_year") or "—",
@@ -218,10 +270,10 @@ with st.expander("Search Open Library to autofill", expanded=True):
         st.markdown("**All editions found — use as reference:**")
         st.dataframe(ref_df, use_container_width=True)
 
-        # Edition picker — one entry per top-level result
         st.markdown("**Select the specific edition you are holding to autofill the form:**")
         edition_labels = {
             i: (
+                f"[{r.get('source', '—')}]  "
                 f"{r.get('title', '—')}  |  "
                 f"{r.get('publisher') or '—'}  |  "
                 f"ISBN: {r.get('isbn') or '—'}  |  "
