@@ -20,6 +20,7 @@ from search import (
     search_worldcat_advanced,
     search_worldcat_by_isbn,
     worldcat_available,
+    google_books_available,
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
@@ -144,13 +145,19 @@ for k, v in _DEFAULTS.items():
 with st.expander("Search catalogs to autofill", expanded=True):
     # Source selection
     _wc_ok = worldcat_available()
+    _gb_ok = google_books_available()
     src_col, _ = st.columns([2, 1])
     with src_col:
         selected_sources = st.multiselect(
             "Search in",
             options=["Open Library", "Google Books", "WorldCat"],
-            default=["Open Library", "Google Books"],
+            default=["Open Library"] + (["Google Books"] if _gb_ok else []),
             key="s_sources",
+        )
+    if "Google Books" in (selected_sources or []) and not _gb_ok:
+        st.info(
+            "Google Books requires a `GOOGLE_BOOKS_API_KEY` environment variable. "
+            "Get a free key at console.cloud.google.com (Books API, 1000 req/day free)."
         )
     if "WorldCat" in (selected_sources or []) and not _wc_ok:
         st.info(
@@ -194,7 +201,9 @@ with st.expander("Search catalogs to autofill", expanded=True):
             missing = True
 
         if not missing:
-            active = [s for s in selected_sources if s != "WorldCat" or _wc_ok]
+            active = [s for s in selected_sources
+                      if not (s == "WorldCat" and not _wc_ok)
+                      and not (s == "Google Books" and not _gb_ok)]
             if not active:
                 st.warning("Select at least one search source.")
             else:

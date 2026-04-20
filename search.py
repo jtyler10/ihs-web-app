@@ -130,10 +130,18 @@ def _parse_google_books(items):
     return parsed
 
 
+def google_books_available():
+    return bool(os.environ.get("GOOGLE_BOOKS_API_KEY"))
+
+
 def _google_search(query, limit=5):
+    params = {"q": query, "maxResults": limit, "printType": "books"}
+    api_key = os.environ.get("GOOGLE_BOOKS_API_KEY")
+    if api_key:
+        params["key"] = api_key
     resp = requests.get(
         "https://www.googleapis.com/books/v1/volumes",
-        params={"q": query, "maxResults": limit, "printType": "books"},
+        params=params,
         timeout=_TIMEOUT,
     )
     resp.raise_for_status()
