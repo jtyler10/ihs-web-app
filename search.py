@@ -1,11 +1,8 @@
 import os
 import re
 import requests
-import xml.etree.ElementTree as ET
 
 _TIMEOUT = 120  # seconds
-_MODS_NS = "http://www.loc.gov/mods/v3"
-_LOC_SRU = "http://lx2.loc.gov/sru/catalog"
 
 
 # ── Open Library ─────────────────────────────────────────────────────────
@@ -98,121 +95,85 @@ def search_openlibrary_by_isbn(isbn):
     }
 
 
-# ── Library of Congress (SRU catalog) ────────────────────────────────────
+# ── Library of Congress ───────────────────────────────────────────────────
+# Uses the public loc.gov/books JSON API with quoted-phrase queries for
+# relevance. The legacy lx2.loc.gov SRU endpoint is inaccessible from
+# external hosts (persistent 502 proxy errors).
 
-def _parse_mods_xml(xml_text):
-    """Parse SRU/MODS XML response into result dicts."""
-    root = ET.fromstring(xml_text)
-    results = []
-    for mods in root.iter(f"{{{_MODS_NS}}}mods"):
-        # Title (+ optional subtitle)
-        ti = mods.find(f".//{{{_MODS_NS}}}titleInfo[not(@type)]/{{{_MODS_NS}}}title")
-        if ti is None:
-            ti = mods.find(f".//{{{_MODS_NS}}}titleInfo/{{{_MODS_NS}}}title")
-        title = (ti.text or "").strip() if ti is not None else ""
+def _parse_loc_json(results):
+    parsed = []
+    for r in results:
+        title = (r.get("title") or "").strip().rstrip("/").strip()
         if not title:
             continue
-        sub = mods.find(f".//{{{_MODS_NS}}}titleInfo/{{{_MODS_NS}}}subTitle")
-        if sub is not None and sub.text:
-            title = title.rstrip(":").strip() + ": " + sub.text.strip()
 
-        # Authors — collect all personal name entries
-        authors = []
-        for name in mods.findall(f".//{{{_MODS_NS}}}name[@type='personal']"):
-            parts = [np.text.strip() for np in name.findall(f"{{{_MODS_NS}}}namePart") if np.text]
-            if parts:
-                authors.append(", ".join(parts))
-        author_str = "; ".join(authors) or None
+        contributors = r.get("contributor") or []
+        if isinstance(contributors, str):
+            contributors = [contributors]
+        authors = ", ".join(c for c in contributors if c) or None
 
-        # Publication info
-        origin = mods.find(f".//{{{_MODS_NS}}}originInfo")
-        publisher = place = year = None
-        if origin is not None:
-            pub_el = origin.find(f"{{{_MODS_NS}}}publisher")
-            if pub_el is not None:
-                publisher = (pub_el.text or "").strip() or None
+        date = str(r.get("date") or "")
+        year_m = re.search(r"\b(\d{4})\b", date)
+        year = year_m.group(1) if year_m else None
 
-            for pt in [f".//{{{_MODS_NS}}}place/{{{_MODS_NS}}}placeTerm[@type='text']",
-                       f".//{{{_MODS_NS}}}place/{{{_MODS_NS}}}placeTerm"]:
-                place_el = origin.find(pt)
-                if place_el is not None and place_el.text:
-                    place = place_el.text.strip() or None
-                    break
+        pub_name = pub_city = None
+        item = r.get("item") or {}
+        created = item.get("created_published") or ""
+        if isinstance(created, list):
+            created = created[0] if created else ""
+        if created:
+            cp = created.split(":", 1)
+            if len(cp) == 2:
+                pub_city = cp[0].strip().strip("[]").strip() or None
+                rest = cp[1].strip()
+                pub_name = re.sub(r",?\s*\d{4}[\.,]?\s*$", "", rest).strip().rstrip(",").strip() or None
 
-            for tag in [f"{{{_MODS_NS}}}dateIssued", f"{{{_MODS_NS}}}copyrightDate"]:
-                date_el = origin.find(tag)
-                if date_el is not None and date_el.text:
-                    m = re.search(r"\b(\d{4})\b", date_el.text)
-                    if m:
-                        year = m.group(1)
-                        break
-
-        # ISBNs
-        all_isbns = [
-            ident.text.strip().replace("-", "")
-            for ident in mods.findall(f".//{{{_MODS_NS}}}identifier[@type='isbn']")
-            if ident.text
-        ]
-
-        # Language
-        lang_el = mods.find(f".//{{{_MODS_NS}}}language/{{{_MODS_NS}}}languageTerm")
-        language = lang_el.text if lang_el is not None else None
-
-        results.append({
+        parsed.append({
             "title": title,
-            "authors": author_str,
-            "isbn": all_isbns[0] if all_isbns else None,
-            "all_isbns": all_isbns,
-            "publisher": publisher,
-            "all_publishers": [publisher] if publisher else [],
-            "publish_place": place,
+            "authors": authors,
+            "isbn": None,
+            "all_isbns": [],
+            "publisher": pub_name,
+            "all_publishers": [pub_name] if pub_name else [],
+            "publish_place": pub_city,
             "pub_year": year,
             "pages": None,
-            "language": language,
+            "language": None,
             "source": "Library of Congress",
         })
-    return results
+    return parsed
 
 
-def _loc_sru_search(query, limit=5):
+def _loc_search(query, limit=5):
     resp = requests.get(
-        _LOC_SRU,
-        params={
-            "version": "1.1",
-            "operation": "searchRetrieve",
-            "query": query,
-            "maximumRecords": str(limit),
-            "recordSchema": "mods",
-        },
+        "https://www.loc.gov/books/",
+        params={"q": query, "fo": "json", "c": str(limit)},
         timeout=_TIMEOUT,
     )
     resp.raise_for_status()
-    return _parse_mods_xml(resp.text)
+    return _parse_loc_json(resp.json().get("results", [])[:limit])
 
 
 def search_loc_by_title(title, limit=5):
-    return _loc_sru_search(f'dc.title="{title}"', limit)
+    return _loc_search(f'"{title}"', limit)
 
 
 def search_loc_by_author(author, limit=5):
-    return _loc_sru_search(f'dc.creator="{author}"', limit)
+    return _loc_search(f'"{author}"', limit)
 
 
 def search_loc_by_isbn(isbn):
     isbn_clean = isbn.replace("-", "").replace(" ", "")
-    results = _loc_sru_search(f'bath.isbn="{isbn_clean}"', 1)
+    results = _loc_search(isbn_clean, 1)
     return results[0] if results else None
 
 
 def search_loc_advanced(title=None, author=None, limit=5):
-    parts = []
-    if title:
-        parts.append(f'dc.title="{title}"')
-    if author:
-        parts.append(f'dc.creator="{author}"')
+    # Quoted phrases for both terms — LOC treats adjacent quoted phrases as AND
+    parts = [f'"{p}"' for p in [title, author] if p]
     if not parts:
         return []
-    return _loc_sru_search(" AND ".join(parts), limit)
+    return _loc_search(" ".join(parts), limit)
 
 
 # ── WorldCat (requires OCLC_CLIENT_ID + OCLC_CLIENT_SECRET) ──────────────

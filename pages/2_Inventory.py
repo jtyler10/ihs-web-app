@@ -178,93 +178,9 @@ st.markdown("""
 
 st.markdown(f"**{len(filtered)}** of **{len(df)}** books")
 
-# ── Helpers ───────────────────────────────────────────────────────────
-def _trunc(s, n):
-    s = str(s) if s else "—"
-    return s if len(s) <= n else s[:n - 1] + "…"
-
-_W = [4, 2.5, 1.5, 1, 1.5, 1.5, 0.45, 0.45]
-PAGE_SIZE = 25
-
-# ── Table / Cover Gallery tabs ────────────────────────────────────────
-tab_table, tab_covers = st.tabs(["Table", "Cover Gallery"])
-
-with tab_table:
-    # Clamp page if filtered set shrank
-    n_pages = max(1, (len(filtered) + PAGE_SIZE - 1) // PAGE_SIZE)
-    if st.session_state["_inv_page"] >= n_pages:
-        st.session_state["_inv_page"] = 0
-    page = st.session_state["_inv_page"]
-    page_df = filtered.iloc[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]
-
-    # Header row
-    hcols = st.columns(_W)
-    for col, label in zip(hcols, ["Title", "Authors", "ISBN", "Year", "Owner", "Condition", "", ""]):
-        col.markdown(f"**{label}**")
-    st.divider()
-
-    # Data rows
-    for _, row in page_df.iterrows():
-        c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(_W)
-        c1.write(_trunc(row["Title"], 45))
-        c2.write(_trunc(row["Authors"], 30))
-        c3.write(row["ISBN"] or "—")
-        c4.write(row["Year"] or "—")
-        c5.write(row["Owner"] or "—")
-        c6.write(row["Condition"] or "—")
-        if c7.button("✏️", key=f"edit_{row['ID']}", help="Edit", use_container_width=True):
-            st.session_state["_load_edit_id"] = row["ID"]
-            st.rerun()
-        if c8.button("🗑️", key=f"del_{row['ID']}", help="Delete", use_container_width=True):
-            st.session_state["delete_pending_id"] = row["ID"]
-            st.rerun()
-
-    # Pagination controls
-    if n_pages > 1:
-        pc1, pc2, pc3 = st.columns([1, 3, 1])
-        with pc1:
-            if page > 0 and st.button("← Prev", use_container_width=True):
-                st.session_state["_inv_page"] = page - 1
-                st.rerun()
-        with pc2:
-            st.markdown(
-                f"<div style='text-align:center;padding-top:6px'>Page {page + 1} of {n_pages}</div>",
-                unsafe_allow_html=True,
-            )
-        with pc3:
-            if page < n_pages - 1 and st.button("Next →", use_container_width=True):
-                st.session_state["_inv_page"] = page + 1
-                st.rerun()
-
-    st.markdown("---")
-    csv = filtered.to_csv(index=False)
-    st.download_button("Download as CSV", data=csv, file_name="ihs_inventory.csv", mime="text/csv")
-
-with tab_covers:
-    COLS = 4
-    COVER_URL = "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
-    PLACEHOLDER = "https://via.placeholder.com/128x192.png?text=No+Cover"
-    cover_rows = [filtered.iloc[i:i+COLS] for i in range(0, len(filtered), COLS)]
-    for cover_row in cover_rows:
-        cols = st.columns(COLS)
-        for col, (_, book) in zip(cols, cover_row.iterrows()):
-            with col:
-                isbn = book["ISBN"].strip()
-                img_url = COVER_URL.format(isbn=isbn) if isbn else PLACEHOLDER
-                st.image(img_url, width=128)
-                title_display = book["Title"] if len(book["Title"]) <= 40 else book["Title"][:37] + "…"
-                authors_display = book["Authors"] if len(book["Authors"]) <= 35 else book["Authors"][:32] + "…"
-                st.markdown(
-                    f"**{title_display}**  \n"
-                    f"<span style='font-size:0.8em;color:gray;'>{authors_display or '—'}</span>  \n"
-                    f"<span style='font-size:0.8em;color:gray;'>ISBN: {isbn or '—'}</span>",
-                    unsafe_allow_html=True,
-                )
-
-# ── Edit form (triggered by ✏️) ───────────────────────────────────────
+# ── Edit form (shown above the table when ✏️ is clicked) ─────────────
 if st.session_state["_editing_id"] is not None:
     eid = st.session_state["_editing_id"]
-    st.markdown("---")
     st.subheader(f"Editing — {st.session_state.get('e_title', '') or f'id={eid}'}")
 
     ec1, ec2 = st.columns(2)
@@ -351,7 +267,6 @@ if st.session_state["_editing_id"] is not None:
     st.text_area("Description", key="e_description", height=80)
     st.text_area("Notes", key="e_notes", height=80)
 
-    st.markdown("---")
     sv1, sv2 = st.columns(2)
     with sv1:
         if st.button("Save Changes", type="primary", use_container_width=True):
@@ -402,7 +317,9 @@ if st.session_state["_editing_id"] is not None:
             st.session_state["_editing_id"] = None
             st.rerun()
 
-# ── Delete confirmation (triggered by 🗑️) ─────────────────────────────
+    st.markdown("---")
+
+# ── Delete confirmation (shown above the table when 🗑️ is clicked) ────
 if st.session_state["delete_pending_id"] is not None:
     del_id = st.session_state["delete_pending_id"]
     del_row = df[df["ID"] == del_id]
@@ -410,7 +327,6 @@ if st.session_state["delete_pending_id"] is not None:
         st.session_state["delete_pending_id"] = None
         st.rerun()
     del_title = del_row["Title"].values[0]
-    st.markdown("---")
     st.warning(
         f"Are you sure you want to permanently remove **{del_title}**? "
         "This cannot be undone."
@@ -436,3 +352,84 @@ if st.session_state["delete_pending_id"] is not None:
         if st.button("Cancel", key="del_cancel", use_container_width=True):
             st.session_state["delete_pending_id"] = None
             st.rerun()
+
+    st.markdown("---")
+
+# ── Helpers ───────────────────────────────────────────────────────────
+def _trunc(s, n):
+    s = str(s) if s else "—"
+    return s if len(s) <= n else s[:n - 1] + "…"
+
+_W = [4, 2.5, 1.5, 1, 1.5, 1.5, 0.45, 0.45]
+PAGE_SIZE = 25
+
+# ── Table / Cover Gallery tabs ────────────────────────────────────────
+tab_table, tab_covers = st.tabs(["Table", "Cover Gallery"])
+
+with tab_table:
+    n_pages = max(1, (len(filtered) + PAGE_SIZE - 1) // PAGE_SIZE)
+    if st.session_state["_inv_page"] >= n_pages:
+        st.session_state["_inv_page"] = 0
+    page = st.session_state["_inv_page"]
+    page_df = filtered.iloc[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]
+
+    hcols = st.columns(_W)
+    for col, label in zip(hcols, ["Title", "Authors", "ISBN", "Year", "Owner", "Condition", "", ""]):
+        col.markdown(f"**{label}**")
+    st.divider()
+
+    for _, row in page_df.iterrows():
+        c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(_W)
+        c1.write(_trunc(row["Title"], 45))
+        c2.write(_trunc(row["Authors"], 30))
+        c3.write(row["ISBN"] or "—")
+        c4.write(row["Year"] or "—")
+        c5.write(row["Owner"] or "—")
+        c6.write(row["Condition"] or "—")
+        if c7.button("✏️", key=f"edit_{row['ID']}", help="Edit", use_container_width=True):
+            st.session_state["_load_edit_id"] = row["ID"]
+            st.rerun()
+        if c8.button("🗑️", key=f"del_{row['ID']}", help="Delete", use_container_width=True):
+            st.session_state["delete_pending_id"] = row["ID"]
+            st.rerun()
+
+    if n_pages > 1:
+        pc1, pc2, pc3 = st.columns([1, 3, 1])
+        with pc1:
+            if page > 0 and st.button("← Prev", use_container_width=True):
+                st.session_state["_inv_page"] = page - 1
+                st.rerun()
+        with pc2:
+            st.markdown(
+                f"<div style='text-align:center;padding-top:6px'>Page {page + 1} of {n_pages}</div>",
+                unsafe_allow_html=True,
+            )
+        with pc3:
+            if page < n_pages - 1 and st.button("Next →", use_container_width=True):
+                st.session_state["_inv_page"] = page + 1
+                st.rerun()
+
+    st.markdown("---")
+    csv = filtered.to_csv(index=False)
+    st.download_button("Download as CSV", data=csv, file_name="ihs_inventory.csv", mime="text/csv")
+
+with tab_covers:
+    COLS = 4
+    COVER_URL = "https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
+    PLACEHOLDER = "https://via.placeholder.com/128x192.png?text=No+Cover"
+    cover_rows = [filtered.iloc[i:i+COLS] for i in range(0, len(filtered), COLS)]
+    for cover_row in cover_rows:
+        cols = st.columns(COLS)
+        for col, (_, book) in zip(cols, cover_row.iterrows()):
+            with col:
+                isbn = book["ISBN"].strip()
+                img_url = COVER_URL.format(isbn=isbn) if isbn else PLACEHOLDER
+                st.image(img_url, width=128)
+                title_display = book["Title"] if len(book["Title"]) <= 40 else book["Title"][:37] + "…"
+                authors_display = book["Authors"] if len(book["Authors"]) <= 35 else book["Authors"][:32] + "…"
+                st.markdown(
+                    f"**{title_display}**  \n"
+                    f"<span style='font-size:0.8em;color:gray;'>{authors_display or '—'}</span>  \n"
+                    f"<span style='font-size:0.8em;color:gray;'>ISBN: {isbn or '—'}</span>",
+                    unsafe_allow_html=True,
+                )
