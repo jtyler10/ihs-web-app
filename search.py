@@ -95,10 +95,79 @@ def search_openlibrary_by_isbn(isbn):
     }
 
 
+# ── Google Books ─────────────────────────────────────────────────────────
+# Free, no API key needed. Supports intitle:/inauthor: field operators.
+
+def _parse_google_books(items):
+    parsed = []
+    for item in (items or []):
+        vi = item.get("volumeInfo") or {}
+        title = vi.get("title") or ""
+        if not title:
+            continue
+        subtitle = vi.get("subtitle")
+        if subtitle:
+            title = f"{title}: {subtitle}"
+        authors = ", ".join(vi.get("authors") or []) or None
+        pub_date = vi.get("publishedDate") or ""
+        year_m = re.search(r"\b(\d{4})\b", pub_date)
+        idents = vi.get("industryIdentifiers") or []
+        isbns = [i["identifier"] for i in idents
+                 if i.get("type") in ("ISBN_13", "ISBN_10") and i.get("identifier")]
+        parsed.append({
+            "title": title,
+            "authors": authors,
+            "isbn": isbns[0] if isbns else None,
+            "all_isbns": isbns,
+            "publisher": vi.get("publisher") or None,
+            "all_publishers": [vi["publisher"]] if vi.get("publisher") else [],
+            "publish_place": None,
+            "pub_year": year_m.group(1) if year_m else None,
+            "pages": vi.get("pageCount") or None,
+            "language": vi.get("language") or None,
+            "source": "Google Books",
+        })
+    return parsed
+
+
+def _google_search(query, limit=5):
+    resp = requests.get(
+        "https://www.googleapis.com/books/v1/volumes",
+        params={"q": query, "maxResults": limit, "printType": "books"},
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return _parse_google_books(resp.json().get("items"))
+
+
+def search_google_by_title(title, limit=5):
+    return _google_search(f'intitle:"{title}"', limit)
+
+
+def search_google_by_author(author, limit=5):
+    return _google_search(f'inauthor:"{author}"', limit)
+
+
+def search_google_by_isbn(isbn):
+    isbn_clean = isbn.replace("-", "").replace(" ", "")
+    results = _google_search(f"isbn:{isbn_clean}", 1)
+    return results[0] if results else None
+
+
+def search_google_advanced(title=None, author=None, limit=5):
+    parts = []
+    if title:
+        parts.append(f'intitle:"{title}"')
+    if author:
+        parts.append(f'inauthor:"{author}"')
+    if not parts:
+        return []
+    return _google_search(" ".join(parts), limit)
+
+
 # ── Library of Congress ───────────────────────────────────────────────────
-# Uses the public loc.gov/books JSON API with quoted-phrase queries for
-# relevance. The legacy lx2.loc.gov SRU endpoint is inaccessible from
-# external hosts (persistent 502 proxy errors).
+# loc.gov/books JSON API with quoted-phrase queries.
+# Note: the lx2.loc.gov SRU endpoint is inaccessible from external hosts.
 
 def _parse_loc_json(results):
     parsed = []

@@ -11,10 +11,10 @@ from search import (
     search_openlibrary_by_author,
     search_openlibrary_advanced,
     search_openlibrary_by_isbn,
-    search_loc_by_title,
-    search_loc_by_author,
-    search_loc_advanced,
-    search_loc_by_isbn,
+    search_google_by_title,
+    search_google_by_author,
+    search_google_advanced,
+    search_google_by_isbn,
     search_worldcat_by_title,
     search_worldcat_by_author,
     search_worldcat_advanced,
@@ -148,11 +148,11 @@ with st.expander("Search catalogs to autofill", expanded=True):
     with src_col:
         selected_sources = st.multiselect(
             "Search in",
-            options=["Library of Congress", "Open Library", "WorldCat"],
-            default=["Library of Congress", "Open Library"],
+            options=["Open Library", "Google Books", "WorldCat"],
+            default=["Open Library", "Google Books"],
             key="s_sources",
         )
-    if "WorldCat" in selected_sources and not _wc_ok:
+    if "WorldCat" in (selected_sources or []) and not _wc_ok:
         st.info(
             "WorldCat requires `OCLC_CLIENT_ID` and `OCLC_CLIENT_SECRET` "
             "environment variables to be set."
@@ -214,17 +214,17 @@ with st.expander("Search catalogs to autofill", expanded=True):
                                 else:
                                     all_results += search_openlibrary_advanced(title=qt, author=qa)
 
-                            elif source == "Library of Congress":
+                            elif source == "Google Books":
                                 if s_type == "Title":
-                                    all_results += search_loc_by_title(qt)
+                                    all_results += search_google_by_title(qt)
                                 elif s_type == "Author":
-                                    all_results += search_loc_by_author(qa)
+                                    all_results += search_google_by_author(qa)
                                 elif s_type == "ISBN":
-                                    r = search_loc_by_isbn(qi)
+                                    r = search_google_by_isbn(qi)
                                     if r:
                                         all_results.append(r)
                                 else:
-                                    all_results += search_loc_advanced(title=qt, author=qa)
+                                    all_results += search_google_advanced(title=qt, author=qa)
 
                             elif source == "WorldCat":
                                 if s_type == "Title":
