@@ -327,6 +327,11 @@ if st.session_state["_editing_id"] is not None:
 
 # ── Delete confirmation (shown above the table when 🗑️ is clicked) ────
 if st.session_state["delete_pending_id"] is not None:
+    components.html("""
+    <script>
+    window.parent.document.querySelector('section.main').scrollTo({top: 0, behavior: 'smooth'});
+    </script>
+    """, height=0)
     del_id = st.session_state["delete_pending_id"]
     del_row = df[df["ID"] == del_id]
     if del_row.empty:
