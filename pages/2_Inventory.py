@@ -164,6 +164,18 @@ if owner_filter != "All":
 if priority_filter != "All":
     filtered = filtered[filtered["Priority"] == priority_filter]
 
+st.markdown("""
+<style>
+[data-testid="stHorizontalBlock"] .stButton button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(f"**{len(filtered)}** of **{len(df)}** books")
 
 # ── Helpers ───────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 _TIMEOUT = 120  # seconds
 _MODS_NS = "http://www.loc.gov/mods/v3"
-_LOC_SRU = "https://lx2.loc.gov/sru/catalog"
+_LOC_SRU = "http://lx2.loc.gov/sru/catalog"
 
 
 # ── Open Library ─────────────────────────────────────────────────────────
