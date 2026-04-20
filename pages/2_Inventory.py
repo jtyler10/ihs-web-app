@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import sqlalchemy
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from db import SessionLocal
 from models import Book
@@ -180,6 +181,11 @@ st.markdown(f"**{len(filtered)}** of **{len(df)}** books")
 
 # ── Edit form (shown above the table when ✏️ is clicked) ─────────────
 if st.session_state["_editing_id"] is not None:
+    components.html("""
+    <script>
+    window.parent.document.querySelector('section.main').scrollTo({top: 0, behavior: 'smooth'});
+    </script>
+    """, height=0)
     eid = st.session_state["_editing_id"]
     st.subheader(f"Editing — {st.session_state.get('e_title', '') or f'id={eid}'}")
 
