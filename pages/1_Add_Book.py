@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import requests as _requests
 import sqlalchemy
 import streamlit as st
 from db import SessionLocal
@@ -15,6 +16,8 @@ from search import (
     search_loc_by_author,
     search_loc_by_isbn,
     search_loc_advanced,
+    search_internet_archive,
+    get_ia_pdfs,
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
@@ -278,6 +281,101 @@ with st.expander("Search catalogs to autofill", expanded=True):
             st.session_state["_prefill"] = results[chosen]
             st.session_state["_search_results"] = []
             st.rerun()
+
+# ── Internet Archive PDF search ───────────────────────────────────────
+with st.expander("Search Internet Archive for PDF", expanded=False):
+    # Resolve current title/author from form state
+    _ia_title = st.session_state.get("f_title", "").strip()
+    _ia_author_sel = st.session_state.get("f_author_select", "")
+    _ia_author = (
+        _ia_author_sel if _ia_author_sel and _ia_author_sel != _MANUAL
+        else st.session_state.get("f_authors", "")
+    ).strip()
+
+    if _ia_title or _ia_author:
+        st.caption(
+            f"Searching for: **{_ia_title or '(no title)'}**"
+            + (f" by {_ia_author}" if _ia_author else "")
+        )
+    else:
+        st.info("Fill in the Title and/or Author fields below first, then come back here.")
+
+    if st.button("Search Internet Archive", use_container_width=True, key="ia_search_btn"):
+        if not _ia_title and not _ia_author:
+            st.warning("Enter a title or author in the form below first.")
+        else:
+            with st.spinner("Searching Internet Archive…"):
+                try:
+                    st.session_state["_ia_results"] = search_internet_archive(
+                        title=_ia_title or None,
+                        author=_ia_author or None,
+                        limit=8,
+                    )
+                    for k in list(st.session_state):
+                        if k.startswith(("_ia_pdfs_", "_ia_bytes_")):
+                            del st.session_state[k]
+                except Exception as e:
+                    st.error(f"Search error: {e}")
+                    st.session_state["_ia_results"] = []
+
+    ia_results = st.session_state.get("_ia_results")
+    if ia_results is not None:
+        if not ia_results:
+            st.info("No freely downloadable PDFs found on Internet Archive for this title.")
+        for item in ia_results:
+            iid = item["identifier"]
+            st.markdown(f"**{item['title']}**  —  {item['creator']}  ({item['year']})")
+            pdf_key   = f"_ia_pdfs_{iid}"
+            col_link, col_btn = st.columns([1, 1])
+            with col_link:
+                st.markdown(
+                    f'<a href="{item["ia_url"]}" target="_blank">View on Archive.org ↗</a>',
+                    unsafe_allow_html=True,
+                )
+            with col_btn:
+                if pdf_key not in st.session_state:
+                    if st.button("Get PDFs", key=f"ia_get_{iid}"):
+                        with st.spinner("Fetching file list…"):
+                            try:
+                                st.session_state[pdf_key] = get_ia_pdfs(iid)
+                            except Exception as e:
+                                st.error(f"Could not fetch files: {e}")
+                                st.session_state[pdf_key] = []
+                        st.rerun()
+            if pdf_key in st.session_state:
+                pdfs = st.session_state[pdf_key]
+                if not pdfs:
+                    st.caption("  No PDF files found for this item.")
+                for pdf in pdfs:
+                    bytes_key = f"_ia_bytes_{iid}_{pdf['name']}"
+                    fc, bc = st.columns([3, 2])
+                    with fc:
+                        st.caption(f"  {pdf['name']}  ({pdf['size_mb']} MB)")
+                    with bc:
+                        if bytes_key in st.session_state:
+                            st.download_button(
+                                "⬇ Save PDF",
+                                data=st.session_state[bytes_key],
+                                file_name=pdf["name"],
+                                mime="application/pdf",
+                                key=f"ia_save_{iid}_{pdf['name']}",
+                                use_container_width=True,
+                            )
+                        else:
+                            if st.button(
+                                "⬇ Download",
+                                key=f"ia_dl_{iid}_{pdf['name']}",
+                                use_container_width=True,
+                            ):
+                                with st.spinner(f"Downloading {pdf['size_mb']} MB…"):
+                                    try:
+                                        r = _requests.get(pdf["url"], timeout=300)
+                                        r.raise_for_status()
+                                        st.session_state[bytes_key] = r.content
+                                    except Exception as e:
+                                        st.error(f"Download failed: {e}")
+                                st.rerun()
+            st.markdown("---")
 
 st.markdown("---")
 st.subheader("Book Details")
