@@ -9,3 +9,6 @@ pymupdf>=1.22
 pytesseract>=0.3
 pillow>=9.0
 bookops-worldcat>=0.5
+pymarc>=5.0
+ply>=3.11
+PyZ3950 @ git+https://github.com/asl2/PyZ3950.git
