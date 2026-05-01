@@ -14,7 +14,13 @@ st.markdown(
 
 uploaded = st.file_uploader("Choose a PDF file", type="pdf")
 
-if uploaded:
+# Accept a PDF pre-loaded from the NextCloud browser
+_nc_bytes = st.session_state.pop("_nc_pdf_bytes", None)
+_nc_name  = st.session_state.pop("_nc_pdf_name", None)
+if _nc_bytes and not uploaded:
+    st.info(f"Using PDF from NextCloud: **{_nc_name}**")
+
+if uploaded or _nc_bytes:
     try:
         import fitz          # PyMuPDF
         from PIL import Image
@@ -23,7 +29,8 @@ if uploaded:
         st.error(f"Missing dependency: {e}. The app may still be deploying — try again in a minute.")
         st.stop()
 
-    pdf_bytes = uploaded.read()
+    pdf_bytes = _nc_bytes if _nc_bytes else uploaded.read()
+    pdf_name  = _nc_name  if _nc_bytes else uploaded.name
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     total_pages = len(doc)
 
@@ -120,7 +127,7 @@ if uploaded:
     st.text_area("Extracted text", cleaned_text[:3000], height=400)
 
     # ── Download ──────────────────────────────────────────────────────
-    base_name = os.path.splitext(uploaded.name)[0]
+    base_name = os.path.splitext(pdf_name)[0]
     out_filename = f"{base_name}_extracted.txt"
 
     st.download_button(

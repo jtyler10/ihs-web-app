@@ -7,6 +7,7 @@ import sqlalchemy
 import streamlit as st
 from db import SessionLocal
 from models import Book, Production
+from nextcloud import nc_configured, nc_upload as _nc_upload
 from search import (
     search_openlibrary_by_title,
     search_openlibrary_by_author,
@@ -361,6 +362,35 @@ with st.expander("Search Internet Archive for PDF", expanded=False):
                                 key=f"ia_save_{iid}_{pdf['name']}",
                                 use_container_width=True,
                             )
+                            if nc_configured():
+                                nc_up_err = f"_nc_up_err_{iid}_{pdf['name']}"
+                                nc_up_ok  = f"_nc_up_ok_{iid}_{pdf['name']}"
+                                if st.session_state.get(nc_up_err):
+                                    st.error(st.session_state.pop(nc_up_err))
+                                if st.session_state.get(nc_up_ok):
+                                    st.success(st.session_state.pop(nc_up_ok))
+                                with st.expander("Upload to NextCloud"):
+                                    _title = st.session_state.get("f_title", "").strip()
+                                    _default_nc = (
+                                        f"Books/{_title}/{pdf['name']}" if _title else f"Books/{pdf['name']}"
+                                    )
+                                    _nc_dest = st.text_input(
+                                        "Save as (path in NC)",
+                                        value=_default_nc,
+                                        key=f"nc_dest_{iid}_{pdf['name']}",
+                                    )
+                                    if st.button(
+                                        "Upload to NextCloud",
+                                        key=f"nc_up_{iid}_{pdf['name']}",
+                                        use_container_width=True,
+                                    ):
+                                        with st.spinner(f"Uploading to {_nc_dest}…"):
+                                            try:
+                                                _nc_upload(_nc_dest, st.session_state[bytes_key])
+                                                st.session_state[nc_up_ok] = f"Uploaded to **{_nc_dest}**"
+                                            except Exception as _e:
+                                                st.session_state[nc_up_err] = f"Upload failed: {_e}"
+                                        st.rerun()
                         else:
                             err_key = f"_ia_err_{iid}_{pdf['name']}"
                             if st.session_state.get(err_key):
