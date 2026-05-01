@@ -3,7 +3,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
+import sqlalchemy
 import streamlit as st
+from db import SessionLocal
 from search import search_internet_archive, get_ia_pdfs
 
 st.set_page_config(page_title="Internet Archive — IHS Inventory", layout="centered")
@@ -13,12 +15,52 @@ st.caption(
     "Click 'Get PDFs' on any result to see available files."
 )
 
+# ── Load inventory books once per session ─────────────────────────────
+if "_ia_books" not in st.session_state:
+    session = SessionLocal()
+    try:
+        rows = session.execute(
+            sqlalchemy.text(
+                "SELECT title, authors FROM inventory ORDER BY title"
+            )
+        )
+        st.session_state["_ia_books"] = [
+            {"title": r[0], "authors": r[1] or ""} for r in rows if r[0]
+        ]
+    finally:
+        session.close()
+
+# ── Inventory selector ────────────────────────────────────────────────
+books = st.session_state["_ia_books"]
+book_labels = ["— Type manually —"] + [
+    f"{b['title']}  ({b['authors']})" if b["authors"] else b["title"]
+    for b in books
+]
+
+selected_label = st.selectbox(
+    "Pick a book from inventory (or type below)",
+    options=book_labels,
+    key="ia_book_select",
+)
+
+# Pre-fill title/author when a book is chosen — must happen before widgets render
+if selected_label != "— Type manually —":
+    chosen = books[book_labels.index(selected_label) - 1]
+    st.session_state["ia_title"] = chosen["title"]
+    st.session_state["ia_author"] = chosen["authors"]
+
+st.markdown("---")
+
 # ── Search form ────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 with col1:
-    ia_title = st.text_input("Title", placeholder="e.g. The Servile State", key="ia_title")
+    ia_title = st.text_input(
+        "Title", placeholder="e.g. The Servile State", key="ia_title"
+    )
 with col2:
-    ia_author = st.text_input("Author", placeholder="e.g. Belloc", key="ia_author")
+    ia_author = st.text_input(
+        "Author", placeholder="e.g. Belloc", key="ia_author"
+    )
 
 if st.button("Search", use_container_width=True, type="primary"):
     if not ia_title.strip() and not ia_author.strip():
