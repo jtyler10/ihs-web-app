@@ -11,15 +11,10 @@ from search import (
     search_openlibrary_by_author,
     search_openlibrary_advanced,
     search_openlibrary_by_isbn,
-    search_worldcat_by_title,
-    search_worldcat_by_author,
-    search_worldcat_advanced,
-    search_worldcat_by_isbn,
     search_loc_by_title,
     search_loc_by_author,
     search_loc_by_isbn,
     search_loc_advanced,
-    worldcat_available,
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
@@ -154,19 +149,13 @@ for k, v in _DEFAULTS.items():
 # ── Catalog Search ────────────────────────────────────────────────────
 with st.expander("Search catalogs to autofill", expanded=True):
     # Source selection
-    _wc_ok = worldcat_available()
     src_col, _ = st.columns([2, 1])
     with src_col:
         selected_sources = st.multiselect(
             "Search in",
-            options=["Open Library", "WorldCat", "Library of Congress"],
+            options=["Open Library", "Library of Congress"],
             default=["Open Library"],
             key="s_sources",
-        )
-    if "WorldCat" in (selected_sources or []) and not _wc_ok:
-        st.info(
-            "WorldCat requires `OCLC_CLIENT_ID` and `OCLC_CLIENT_SECRET` "
-            "environment variables to be set."
         )
     s_type = st.radio(
         "Search by",
@@ -204,7 +193,7 @@ with st.expander("Search catalogs to autofill", expanded=True):
             missing = True
 
         if not missing:
-            active = [s for s in selected_sources if not (s == "WorldCat" and not _wc_ok)]
+            active = selected_sources
             if not active:
                 st.warning("Select at least one search source.")
             else:
@@ -223,18 +212,6 @@ with st.expander("Search catalogs to autofill", expanded=True):
                                         all_results.append(r)
                                 else:
                                     all_results += search_openlibrary_advanced(title=qt, author=qa)
-
-                            elif source == "WorldCat":
-                                if s_type == "Title":
-                                    all_results += search_worldcat_by_title(qt)
-                                elif s_type == "Author":
-                                    all_results += search_worldcat_by_author(qa)
-                                elif s_type == "ISBN":
-                                    r = search_worldcat_by_isbn(qi)
-                                    if r:
-                                        all_results.append(r)
-                                else:
-                                    all_results += search_worldcat_advanced(title=qt, author=qa)
 
                             elif source == "Library of Congress":
                                 if s_type == "Title":
