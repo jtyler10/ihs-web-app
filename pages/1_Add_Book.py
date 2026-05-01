@@ -376,6 +376,15 @@ with st.expander("Search Internet Archive for PDF", expanded=False):
                                         r.raise_for_status()
                                         st.session_state[bytes_key] = r.content
                                         st.rerun()
+                                    except _requests.exceptions.HTTPError as e:
+                                        if e.response is not None and e.response.status_code == 401:
+                                            st.session_state[err_key] = (
+                                                "This file requires an Internet Archive account. "
+                                                f"Download it directly at: {item['ia_url']}"
+                                            )
+                                        else:
+                                            st.session_state[err_key] = f"Download failed: {e}"
+                                        st.rerun()
                                     except Exception as e:
                                         st.session_state[err_key] = f"Download failed: {e}"
                                         st.rerun()

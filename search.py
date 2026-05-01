@@ -237,7 +237,7 @@ def search_loc_by_isbn(isbn):
 
 def search_internet_archive(title=None, author=None, limit=10):
     """Search Internet Archive for freely downloadable PDF texts."""
-    parts = ["mediatype:texts", "format:PDF"]
+    parts = ["mediatype:texts", "format:PDF", "NOT collection:inlibrary"]
     if title:
         parts.append(f'title:"{title}"')
     if author:
