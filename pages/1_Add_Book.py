@@ -124,18 +124,28 @@ if prefill:
     st.session_state["f_description"] = prefill.get("description") or ""
     if prefill.get("pages"):
         st.session_state["f_pages"] = int(prefill["pages"])
-    # Try to match incoming author to a contributor name
-    incoming = (prefill.get("authors") or "").strip().lower()
+    # Try to match incoming author to a contributor name.
+    # LoC returns MARC-style "Last, First" — also try the inverted form.
+    def _invert_name(name):
+        """'Penty, Arthur J.' → 'Arthur J. Penty'"""
+        parts = name.split(",", 1)
+        return (parts[1].strip() + " " + parts[0].strip()) if len(parts) == 2 else name
+
+    incoming_raw = (prefill.get("authors") or "").strip()
+    incoming_variants = {incoming_raw.lower(), _invert_name(incoming_raw).lower()}
     match = next(
         (c for c in st.session_state["_contributors"]
-         if incoming and (incoming in c.lower() or c.lower() in incoming)),
+         if incoming_raw and any(
+             v in c.lower() or c.lower() in v for v in incoming_variants
+         )),
         None,
     )
     if match:
         st.session_state["f_author_select"] = match
     else:
         st.session_state["f_author_select"] = _MANUAL
-        st.session_state["f_authors"] = prefill.get("authors") or ""
+        # Store the natural-order form so it's readable in the text input
+        st.session_state["f_authors"] = _invert_name(incoming_raw) if incoming_raw else ""
 
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
