@@ -11,16 +11,15 @@ from search import (
     search_openlibrary_by_author,
     search_openlibrary_advanced,
     search_openlibrary_by_isbn,
-    search_google_by_title,
-    search_google_by_author,
-    search_google_advanced,
-    search_google_by_isbn,
     search_worldcat_by_title,
     search_worldcat_by_author,
     search_worldcat_advanced,
     search_worldcat_by_isbn,
+    search_loc_by_title,
+    search_loc_by_author,
+    search_loc_by_isbn,
+    search_loc_advanced,
     worldcat_available,
-    google_books_available,
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
@@ -121,7 +120,8 @@ if prefill:
         st.session_state["f_publisher_select"] = _MANUAL
         st.session_state["f_publisher"] = prefill.get("publisher") or ""
         st.session_state["f_publisher_city"] = prefill.get("publish_place") or ""
-    st.session_state["f_language"]  = prefill.get("language") or ""
+    st.session_state["f_language"]    = prefill.get("language") or ""
+    st.session_state["f_description"] = prefill.get("description") or ""
     if prefill.get("pages"):
         st.session_state["f_pages"] = int(prefill["pages"])
     # Try to match incoming author to a contributor name
@@ -145,26 +145,19 @@ for k, v in _DEFAULTS.items():
 with st.expander("Search catalogs to autofill", expanded=True):
     # Source selection
     _wc_ok = worldcat_available()
-    _gb_ok = google_books_available()
     src_col, _ = st.columns([2, 1])
     with src_col:
         selected_sources = st.multiselect(
             "Search in",
-            options=["Open Library", "Google Books", "WorldCat"],
-            default=["Open Library"] + (["Google Books"] if _gb_ok else []),
+            options=["Open Library", "WorldCat", "Library of Congress"],
+            default=["Open Library"],
             key="s_sources",
-        )
-    if "Google Books" in (selected_sources or []) and not _gb_ok:
-        st.info(
-            "Google Books requires a `GOOGLE_BOOKS_API_KEY` environment variable. "
-            "Get a free key at console.cloud.google.com (Books API, 1000 req/day free)."
         )
     if "WorldCat" in (selected_sources or []) and not _wc_ok:
         st.info(
             "WorldCat requires `OCLC_CLIENT_ID` and `OCLC_CLIENT_SECRET` "
             "environment variables to be set."
         )
-
     s_type = st.radio(
         "Search by",
         ["Title", "Author", "ISBN", "Title + Author"],
@@ -201,9 +194,7 @@ with st.expander("Search catalogs to autofill", expanded=True):
             missing = True
 
         if not missing:
-            active = [s for s in selected_sources
-                      if not (s == "WorldCat" and not _wc_ok)
-                      and not (s == "Google Books" and not _gb_ok)]
+            active = [s for s in selected_sources if not (s == "WorldCat" and not _wc_ok)]
             if not active:
                 st.warning("Select at least one search source.")
             else:
@@ -223,18 +214,6 @@ with st.expander("Search catalogs to autofill", expanded=True):
                                 else:
                                     all_results += search_openlibrary_advanced(title=qt, author=qa)
 
-                            elif source == "Google Books":
-                                if s_type == "Title":
-                                    all_results += search_google_by_title(qt)
-                                elif s_type == "Author":
-                                    all_results += search_google_by_author(qa)
-                                elif s_type == "ISBN":
-                                    r = search_google_by_isbn(qi)
-                                    if r:
-                                        all_results.append(r)
-                                else:
-                                    all_results += search_google_advanced(title=qt, author=qa)
-
                             elif source == "WorldCat":
                                 if s_type == "Title":
                                     all_results += search_worldcat_by_title(qt)
@@ -246,6 +225,18 @@ with st.expander("Search catalogs to autofill", expanded=True):
                                         all_results.append(r)
                                 else:
                                     all_results += search_worldcat_advanced(title=qt, author=qa)
+
+                            elif source == "Library of Congress":
+                                if s_type == "Title":
+                                    all_results += search_loc_by_title(qt)
+                                elif s_type == "Author":
+                                    all_results += search_loc_by_author(qa)
+                                elif s_type == "ISBN":
+                                    r = search_loc_by_isbn(qi)
+                                    if r:
+                                        all_results.append(r)
+                                else:
+                                    all_results += search_loc_advanced(title=qt, author=qa)
 
                         except Exception as src_err:
                             st.warning(f"{source} search failed: {src_err}")
