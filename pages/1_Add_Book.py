@@ -362,6 +362,9 @@ with st.expander("Search Internet Archive for PDF", expanded=False):
                                 use_container_width=True,
                             )
                         else:
+                            err_key = f"_ia_err_{iid}_{pdf['name']}"
+                            if st.session_state.get(err_key):
+                                st.error(st.session_state.pop(err_key))
                             if st.button(
                                 "⬇ Download",
                                 key=f"ia_dl_{iid}_{pdf['name']}",
@@ -369,12 +372,13 @@ with st.expander("Search Internet Archive for PDF", expanded=False):
                             ):
                                 with st.spinner(f"Downloading {pdf['size_mb']} MB…"):
                                     try:
-                                        r = _requests.get(pdf["url"], timeout=300)
+                                        r = _requests.get(pdf["url"], timeout=300, allow_redirects=True)
                                         r.raise_for_status()
                                         st.session_state[bytes_key] = r.content
+                                        st.rerun()
                                     except Exception as e:
-                                        st.error(f"Download failed: {e}")
-                                st.rerun()
+                                        st.session_state[err_key] = f"Download failed: {e}"
+                                        st.rerun()
             st.markdown("---")
 
 st.markdown("---")
