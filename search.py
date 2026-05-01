@@ -235,6 +235,72 @@ def search_loc_by_isbn(isbn):
     return results[0] if results else None
 
 
+def search_internet_archive(title=None, author=None, limit=10):
+    """Search Internet Archive for freely downloadable PDF texts."""
+    parts = ["mediatype:texts", "format:PDF", "NOT access-restricted-item:true"]
+    if title:
+        parts.append(f'title:"{title}"')
+    if author:
+        parts.append(f'creator:"{author}"')
+    resp = requests.get(
+        "https://archive.org/advancedsearch.php",
+        params={
+            "q": " AND ".join(parts),
+            "fl[]": ["identifier", "title", "creator", "date", "description"],
+            "output": "json",
+            "rows": limit,
+            "page": 1,
+            "sort[]": "downloads desc",
+        },
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    docs = resp.json().get("response", {}).get("docs", [])
+    results = []
+    for doc in docs:
+        creator = doc.get("creator") or ""
+        if isinstance(creator, list):
+            creator = ", ".join(creator)
+        date_raw = str(doc.get("date") or "")
+        year = date_raw[:4] if len(date_raw) >= 4 else date_raw
+        desc = doc.get("description") or ""
+        if isinstance(desc, list):
+            desc = desc[0] if desc else ""
+        identifier = doc.get("identifier", "")
+        results.append({
+            "identifier": identifier,
+            "title": doc.get("title") or "",
+            "creator": creator,
+            "year": year,
+            "description": desc,
+            "ia_url": f"https://archive.org/details/{identifier}",
+        })
+    return results
+
+
+def get_ia_pdfs(identifier):
+    """Return a list of PDF files available for an Internet Archive item."""
+    resp = requests.get(
+        f"https://archive.org/metadata/{identifier}/files",
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    files = resp.json().get("result", [])
+    pdfs = []
+    for f in files:
+        name = f.get("name", "")
+        if not name.lower().endswith(".pdf"):
+            continue
+        size_mb = round(int(f.get("size", 0)) / 1024 / 1024, 1)
+        pdfs.append({
+            "name": name,
+            "size_mb": size_mb,
+            "url": f"https://archive.org/download/{identifier}/{name}",
+        })
+    pdfs.sort(key=lambda f: f["size_mb"], reverse=True)
+    return pdfs
+
+
 def search_loc_advanced(title=None, author=None, limit=5):
     if title and author:
         pqf = (f'@and @attr 1=4 @attr 4=1 "{title}" '
