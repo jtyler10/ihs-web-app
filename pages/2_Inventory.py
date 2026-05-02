@@ -99,6 +99,8 @@ if new_ep:
 
 # ── Page ──────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Inventory — IHS", layout="wide")
+from auth import require_login
+require_login()
 st.title("Inventory Overview")
 
 session = SessionLocal()

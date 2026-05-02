@@ -6,6 +6,8 @@ import streamlit as st
 from nextcloud import nc_configured, nc_list, nc_download, nc_upload
 
 st.set_page_config(page_title="NextCloud — IHS", layout="wide")
+from auth import require_login
+require_login()
 st.title("NextCloud Files")
 
 if not nc_configured():

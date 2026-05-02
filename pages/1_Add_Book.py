@@ -22,6 +22,8 @@ from search import (
 )
 
 st.set_page_config(page_title="Add Book — IHS Inventory", layout="centered")
+from auth import require_login
+require_login()
 st.title("Add Book to Inventory")
 
 _MANUAL = "— Type name manually —"

@@ -6,6 +6,8 @@ import io
 import streamlit as st
 
 st.set_page_config(page_title="PDF Extraction — IHS", layout="centered")
+from auth import require_login
+require_login()
 st.title("PDF Text Extraction")
 st.markdown(
     "Upload a scanned or mixed PDF to extract and clean the text for use in InDesign or Word. "

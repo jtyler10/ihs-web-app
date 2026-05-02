@@ -9,6 +9,8 @@ if _allow_create == "1":
     Base.metadata.create_all(bind=engine)
 
 st.set_page_config(page_title="IHS Book Production", layout="wide", page_icon="📚")
+from auth import require_login
+require_login()
 
 st.title("IHS Book Production")
 st.markdown(

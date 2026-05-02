@@ -9,6 +9,8 @@ from db import SessionLocal
 from models import Production
 
 st.set_page_config(page_title="Production — IHS Inventory", layout="wide")
+from auth import require_login
+require_login()
 st.title("Production Pipeline")
 
 STAGES = [

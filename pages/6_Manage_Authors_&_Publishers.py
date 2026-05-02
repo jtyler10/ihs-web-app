@@ -7,9 +7,14 @@ import streamlit as st
 from db import SessionLocal
 
 st.set_page_config(page_title="Manage — IHS", layout="wide")
+from auth import require_login
+require_login()
 st.title("Manage Authors & Publishers")
 
-auth_tab, pub_tab = st.tabs(["Authors", "Publishers"])
+_is_admin = st.session_state.get("role") == "admin"
+_tabs = ["Authors", "Publishers"] + (["Users"] if _is_admin else [])
+auth_tab, pub_tab, *_rest = st.tabs(_tabs)
+user_tab = _rest[0] if _rest else None
 
 
 # ── shared helpers ────────────────────────────────────────────────────────────
@@ -338,3 +343,156 @@ with pub_tab:
                     st.rerun()
     else:
         st.info("No publishers match your search." if pq else "No publishers found.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# USERS  (admin only)
+# ══════════════════════════════════════════════════════════════════════════════
+
+if user_tab:
+    with user_tab:
+        from auth import hash_password, check_password
+
+        def _fetch_users():
+            session = SessionLocal()
+            try:
+                rows = session.execute(sqlalchemy.text(
+                    "SELECT id, username, display_name, role, created_at "
+                    "FROM users ORDER BY username"
+                ))
+                return [{"id": r[0], "username": r[1], "display_name": r[2] or "",
+                         "role": r[3] or "user", "created_at": str(r[4] or "")} for r in rows]
+            finally:
+                session.close()
+
+        users = _fetch_users()
+
+        # ── add button ────────────────────────────────────────────────────────
+        uc1, uc2 = st.columns([4, 1])
+        with uc2:
+            st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
+            if st.button("+ Add New User", use_container_width=True, key="u_add_btn"):
+                st.session_state["u_mode"]        = "add"
+                st.session_state["u_selected_id"] = None
+                st.session_state.pop("u_data", None)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # ── add / edit form (before list) ─────────────────────────────────────
+        u_mode = st.session_state.get("u_mode")
+        if u_mode in ("add", "edit"):
+            ud = st.session_state.get("u_data", {}) if u_mode == "edit" else {}
+            st.markdown("---")
+            st.subheader("Edit User" if u_mode == "edit" else "Add New User")
+
+            with st.form("user_form", clear_on_submit=False):
+                uf1, uf2, uf3 = st.columns([2, 2, 1])
+                with uf1:
+                    u_username = st.text_input("Username *", value=ud.get("username") or "")
+                with uf2:
+                    u_display  = st.text_input("Display name", value=ud.get("display_name") or "")
+                with uf3:
+                    u_role = st.selectbox("Role", ["user", "admin"],
+                                          index=0 if ud.get("role") != "admin" else 1)
+
+                st.markdown("**Password**" + (" — leave blank to keep current" if u_mode == "edit" else ""))
+                up1, up2 = st.columns(2)
+                with up1:
+                    u_pass1 = st.text_input("Password", type="password",
+                                            placeholder="New password" if u_mode == "edit" else "")
+                with up2:
+                    u_pass2 = st.text_input("Confirm password", type="password")
+
+                us_col, ud_col, uc_col = st.columns([2, 1, 1])
+                with us_col:
+                    u_submitted = st.form_submit_button("Save", type="primary", use_container_width=True)
+                with ud_col:
+                    u_delete = (
+                        st.form_submit_button("Delete", use_container_width=True)
+                        if u_mode == "edit" else False
+                    )
+                with uc_col:
+                    u_cancel = st.form_submit_button("Cancel", use_container_width=True)
+
+            if u_cancel:
+                st.session_state.pop("u_mode", None)
+                st.session_state.pop("u_data", None)
+                st.rerun()
+
+            if u_delete and u_mode == "edit":
+                if st.session_state["u_selected_id"] == st.session_state.get("username"):
+                    st.error("You cannot delete your own account.")
+                else:
+                    try:
+                        _run("DELETE FROM users WHERE id = :id",
+                             {"id": st.session_state["u_selected_id"]})
+                        st.success("User deleted.")
+                        st.session_state.pop("u_mode", None)
+                        st.session_state.pop("u_data", None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Delete failed: {e}")
+
+            if u_submitted:
+                if not u_username.strip():
+                    st.error("Username is required.")
+                elif u_mode == "add" and not u_pass1:
+                    st.error("Password is required for new users.")
+                elif u_pass1 and u_pass1 != u_pass2:
+                    st.error("Passwords do not match.")
+                else:
+                    try:
+                        if u_mode == "add":
+                            _run(
+                                "INSERT INTO users (username, password_hash, display_name, role) "
+                                "VALUES (:u, :h, :d, :r)",
+                                {"u": u_username.strip(),
+                                 "h": hash_password(u_pass1),
+                                 "d": u_display.strip() or u_username.strip(),
+                                 "r": u_role},
+                            )
+                            st.success(f"Added user **{u_username}**.")
+                        else:
+                            uid = st.session_state["u_selected_id"]
+                            if u_pass1:
+                                _run(
+                                    "UPDATE users SET username=:u, display_name=:d, role=:r, "
+                                    "password_hash=:h WHERE id=:id",
+                                    {"u": u_username.strip(), "d": u_display.strip(),
+                                     "r": u_role, "h": hash_password(u_pass1), "id": uid},
+                                )
+                            else:
+                                _run(
+                                    "UPDATE users SET username=:u, display_name=:d, role=:r WHERE id=:id",
+                                    {"u": u_username.strip(), "d": u_display.strip(),
+                                     "r": u_role, "id": uid},
+                                )
+                            st.success(f"Updated user **{u_username}**.")
+                        st.session_state.pop("u_mode", None)
+                        st.session_state.pop("u_data", None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Save failed: {e}")
+
+            st.markdown("---")
+
+        # ── user list ─────────────────────────────────────────────────────────
+        if users:
+            uh1, uh2, uh3, uh4 = st.columns([3, 3, 2, 1])
+            with uh1: st.markdown("**Username**")
+            with uh2: st.markdown("**Display Name**")
+            with uh3: st.markdown("**Role**")
+            st.divider()
+
+            for u in users:
+                uc1, uc2, uc3, uc4 = st.columns([3, 3, 2, 1])
+                with uc1: st.markdown(u["username"])
+                with uc2: st.markdown(u["display_name"] or "—")
+                with uc3: st.markdown(u["role"])
+                with uc4:
+                    if st.button("✏️", key=f"edit_u_{u['id']}", help="Edit"):
+                        st.session_state["u_mode"]        = "edit"
+                        st.session_state["u_selected_id"] = u["id"]
+                        st.session_state["u_data"]        = u
+                        st.rerun()
+        else:
+            st.info("No users found.")
