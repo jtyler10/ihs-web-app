@@ -2,7 +2,6 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
 import sqlalchemy
 import streamlit as st
 from db import SessionLocal
@@ -71,28 +70,30 @@ with auth_tab:
     ]
 
     if visible:
-        df = pd.DataFrame([{
-            "Name":       a["c_name"],
-            "Born":       (("c. " if a["birthyear_ca"] else "") + (a["birthyear"] or "")) or "—",
-            "Died":       (("c. " if a["deathyear_ca"] else "") + (a["deathyear"] or "")) or "—",
-            "Title":      a["title"] or "—",
-            "Short Bio":  (a["short_bio"] or "")[:80] + ("…" if len(a["short_bio"] or "") > 80 else ""),
-        } for a in visible])
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        h1, h2, h3, h4, h5 = st.columns([3, 2, 3, 5, 1])
+        with h1: st.markdown("**Name**")
+        with h2: st.markdown("**Born – Died**")
+        with h3: st.markdown("**Title / Role**")
+        with h4: st.markdown("**Short Bio**")
+        st.divider()
 
-        sel_name = st.selectbox(
-            "Select an author to edit",
-            options=[a["c_name"] for a in visible],
-            index=None,
-            placeholder="Choose…",
-            key="a_select",
-        )
-        if sel_name:
-            chosen = next(a for a in visible if a["c_name"] == sel_name)
-            if st.button("Edit selected", key="a_edit_btn"):
-                st.session_state["a_mode"]        = "edit"
-                st.session_state["a_selected_id"] = chosen["id"]
-                st.session_state["a_data"]        = chosen
+        for a in visible:
+            born  = ("c. " if a["birthyear_ca"] else "") + (a["birthyear"] or "")
+            died  = ("c. " if a["deathyear_ca"] else "") + (a["deathyear"] or "")
+            dates = " – ".join(filter(None, [born, died])) or "—"
+            bio_p = (a["short_bio"] or "")[:80] + ("…" if len(a["short_bio"] or "") > 80 else "")
+
+            c1, c2, c3, c4, c5 = st.columns([3, 2, 3, 5, 1])
+            with c1: st.markdown(a["c_name"])
+            with c2: st.markdown(dates)
+            with c3: st.markdown(a["title"] or "—")
+            with c4: st.markdown(bio_p or "—")
+            with c5:
+                if st.button("✏️", key=f"edit_a_{a['id']}", help="Edit"):
+                    st.session_state["a_mode"]        = "edit"
+                    st.session_state["a_selected_id"] = a["id"]
+                    st.session_state["a_data"]        = a
+                    st.rerun()
     else:
         st.info("No authors match your search." if q else "No authors found.")
 
@@ -247,22 +248,21 @@ with pub_tab:
     ]
 
     if pub_visible:
-        pdf = pd.DataFrame([{"Name": p["op_name"], "City": p["op_city"] or "—"} for p in pub_visible])
-        st.dataframe(pdf, use_container_width=True, hide_index=True)
+        ph1, ph2, ph3 = st.columns([5, 4, 1])
+        with ph1: st.markdown("**Name**")
+        with ph2: st.markdown("**City**")
+        st.divider()
 
-        p_sel = st.selectbox(
-            "Select a publisher to edit",
-            options=[p["op_name"] for p in pub_visible],
-            index=None,
-            placeholder="Choose…",
-            key="p_select",
-        )
-        if p_sel:
-            p_chosen = next(p for p in pub_visible if p["op_name"] == p_sel)
-            if st.button("Edit selected", key="p_edit_btn"):
-                st.session_state["p_mode"]        = "edit"
-                st.session_state["p_selected_id"] = p_chosen["id"]
-                st.session_state["p_data"]        = p_chosen
+        for p in pub_visible:
+            pc1, pc2, pc3 = st.columns([5, 4, 1])
+            with pc1: st.markdown(p["op_name"])
+            with pc2: st.markdown(p["op_city"] or "—")
+            with pc3:
+                if st.button("✏️", key=f"edit_p_{p['id']}", help="Edit"):
+                    st.session_state["p_mode"]        = "edit"
+                    st.session_state["p_selected_id"] = p["id"]
+                    st.session_state["p_data"]        = p
+                    st.rerun()
     else:
         st.info("No publishers match your search." if pq else "No publishers found.")
 
