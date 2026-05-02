@@ -50,54 +50,19 @@ with auth_tab:
 
     authors = _fetch_authors()
 
-    # ── search + add ─────────────────────────────────────────────────────────
+    # ── search + add button ───────────────────────────────────────────────────
     col_search, col_add = st.columns([4, 1])
     with col_search:
         a_search = st.text_input("Search authors", placeholder="Name, title, bio…", key="a_search")
     with col_add:
         st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
         if st.button("+ Add New Author", use_container_width=True, key="a_add_btn"):
-            st.session_state["a_mode"]       = "add"
+            st.session_state["a_mode"]        = "add"
             st.session_state["a_selected_id"] = None
+            st.session_state.pop("a_data", None)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── filtered list ─────────────────────────────────────────────────────────
-    q = a_search.lower()
-    visible = [
-        a for a in authors
-        if not q or any(q in str(a.get(f) or "").lower()
-                        for f in ("c_name", "title", "short_bio", "bio"))
-    ]
-
-    if visible:
-        h1, h2, h3, h4, h5 = st.columns([3, 2, 3, 5, 1])
-        with h1: st.markdown("**Name**")
-        with h2: st.markdown("**Born – Died**")
-        with h3: st.markdown("**Title / Role**")
-        with h4: st.markdown("**Short Bio**")
-        st.divider()
-
-        for a in visible:
-            born  = ("c. " if a["birthyear_ca"] else "") + (a["birthyear"] or "")
-            died  = ("c. " if a["deathyear_ca"] else "") + (a["deathyear"] or "")
-            dates = " – ".join(filter(None, [born, died])) or "—"
-            bio_p = (a["short_bio"] or "")[:80] + ("…" if len(a["short_bio"] or "") > 80 else "")
-
-            c1, c2, c3, c4, c5 = st.columns([3, 2, 3, 5, 1])
-            with c1: st.markdown(a["c_name"])
-            with c2: st.markdown(dates)
-            with c3: st.markdown(a["title"] or "—")
-            with c4: st.markdown(bio_p or "—")
-            with c5:
-                if st.button("✏️", key=f"edit_a_{a['id']}", help="Edit"):
-                    st.session_state["a_mode"]        = "edit"
-                    st.session_state["a_selected_id"] = a["id"]
-                    st.session_state["a_data"]        = a
-                    st.rerun()
-    else:
-        st.info("No authors match your search." if q else "No authors found.")
-
-    # ── add / edit form ───────────────────────────────────────────────────────
+    # ── add / edit form (rendered BEFORE the list) ────────────────────────────
     mode = st.session_state.get("a_mode")
     if mode in ("add", "edit"):
         d = st.session_state.get("a_data", {}) if mode == "edit" else {}
@@ -149,9 +114,9 @@ with auth_tab:
             st.rerun()
 
         if delete and mode == "edit":
-            author_id = st.session_state["a_selected_id"]
             try:
-                _run("DELETE FROM contributors WHERE c_ID = :id", {"id": author_id})
+                _run("DELETE FROM contributors WHERE c_ID = :id",
+                     {"id": st.session_state["a_selected_id"]})
                 st.success("Author deleted.")
                 st.session_state.pop("a_mode", None)
                 st.session_state.pop("a_data", None)
@@ -204,11 +169,48 @@ with auth_tab:
                         st.success(f"Updated **{c_name}**.")
                     st.session_state.pop("a_mode", None)
                     st.session_state.pop("a_data", None)
-                    # Refresh _contributors cache used by Add Book
                     st.session_state.pop("_contributors", None)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Save failed: {e}")
+
+        st.markdown("---")
+
+    # ── filtered list ─────────────────────────────────────────────────────────
+    q = a_search.lower()
+    visible = [
+        a for a in authors
+        if not q or any(q in str(a.get(f) or "").lower()
+                        for f in ("c_name", "title", "short_bio", "bio"))
+    ]
+
+    if visible:
+        h1, h2, h3, h4, h5 = st.columns([3, 2, 3, 5, 1])
+        with h1: st.markdown("**Name**")
+        with h2: st.markdown("**Born – Died**")
+        with h3: st.markdown("**Title / Role**")
+        with h4: st.markdown("**Short Bio**")
+        st.divider()
+
+        for a in visible:
+            born  = ("c. " if a["birthyear_ca"] else "") + (a["birthyear"] or "")
+            died  = ("c. " if a["deathyear_ca"] else "") + (a["deathyear"] or "")
+            dates = " – ".join(filter(None, [born, died])) or "—"
+            bio_p = (a["short_bio"] or "")[:80] + ("…" if len(a["short_bio"] or "") > 80 else "")
+
+            c1, c2, c3, c4, c5 = st.columns([3, 2, 3, 5, 1])
+            with c1: st.markdown(a["c_name"])
+            with c2: st.markdown(dates)
+            with c3: st.markdown(a["title"] or "—")
+            with c4: st.markdown(bio_p or "—")
+            with c5:
+                if st.button("✏️", key=f"edit_a_{a['id']}", help="Edit"):
+                    st.session_state["a_mode"]        = "edit"
+                    st.session_state["a_selected_id"] = a["id"]
+                    st.session_state["a_data"]        = a
+                    st.rerun()
+    else:
+        st.info("No authors match your search." if q else "No authors found.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -229,7 +231,7 @@ with pub_tab:
 
     publishers = _fetch_publishers()
 
-    # ── search + add ─────────────────────────────────────────────────────────
+    # ── search + add button ───────────────────────────────────────────────────
     pc1, pc2 = st.columns([4, 1])
     with pc1:
         p_search = st.text_input("Search publishers", placeholder="Name or city…", key="p_search")
@@ -238,35 +240,10 @@ with pub_tab:
         if st.button("+ Add New Publisher", use_container_width=True, key="p_add_btn"):
             st.session_state["p_mode"]        = "add"
             st.session_state["p_selected_id"] = None
+            st.session_state.pop("p_data", None)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── filtered list ─────────────────────────────────────────────────────────
-    pq = p_search.lower()
-    pub_visible = [
-        p for p in publishers
-        if not pq or pq in p["op_name"].lower() or pq in p["op_city"].lower()
-    ]
-
-    if pub_visible:
-        ph1, ph2, ph3 = st.columns([5, 4, 1])
-        with ph1: st.markdown("**Name**")
-        with ph2: st.markdown("**City**")
-        st.divider()
-
-        for p in pub_visible:
-            pc1, pc2, pc3 = st.columns([5, 4, 1])
-            with pc1: st.markdown(p["op_name"])
-            with pc2: st.markdown(p["op_city"] or "—")
-            with pc3:
-                if st.button("✏️", key=f"edit_p_{p['id']}", help="Edit"):
-                    st.session_state["p_mode"]        = "edit"
-                    st.session_state["p_selected_id"] = p["id"]
-                    st.session_state["p_data"]        = p
-                    st.rerun()
-    else:
-        st.info("No publishers match your search." if pq else "No publishers found.")
-
-    # ── add / edit form ───────────────────────────────────────────────────────
+    # ── add / edit form (rendered BEFORE the list) ────────────────────────────
     p_mode = st.session_state.get("p_mode")
     if p_mode in ("add", "edit"):
         pd_ = st.session_state.get("p_data", {}) if p_mode == "edit" else {}
@@ -328,9 +305,36 @@ with pub_tab:
                         st.success(f"Updated **{op_name}**.")
                     st.session_state.pop("p_mode", None)
                     st.session_state.pop("p_data", None)
-                    # Refresh publisher cache used by Add Book
                     st.session_state.pop("_publishers", None)
                     st.session_state.pop("_publisher_cities", None)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Save failed: {e}")
+
+        st.markdown("---")
+
+    # ── filtered list ─────────────────────────────────────────────────────────
+    pq = p_search.lower()
+    pub_visible = [
+        p for p in publishers
+        if not pq or pq in p["op_name"].lower() or pq in p["op_city"].lower()
+    ]
+
+    if pub_visible:
+        ph1, ph2, ph3 = st.columns([5, 4, 1])
+        with ph1: st.markdown("**Name**")
+        with ph2: st.markdown("**City**")
+        st.divider()
+
+        for p in pub_visible:
+            pc1, pc2, pc3 = st.columns([5, 4, 1])
+            with pc1: st.markdown(p["op_name"])
+            with pc2: st.markdown(p["op_city"] or "—")
+            with pc3:
+                if st.button("✏️", key=f"edit_p_{p['id']}", help="Edit"):
+                    st.session_state["p_mode"]        = "edit"
+                    st.session_state["p_selected_id"] = p["id"]
+                    st.session_state["p_data"]        = p
+                    st.rerun()
+    else:
+        st.info("No publishers match your search." if pq else "No publishers found.")
