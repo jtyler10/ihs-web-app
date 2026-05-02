@@ -160,7 +160,7 @@ with st.expander("Search catalogs to autofill", expanded=True):
         selected_sources = st.multiselect(
             "Search in",
             options=["Open Library", "Library of Congress"],
-            default=["Open Library"],
+            default=["Open Library", "Library of Congress"],
             key="s_sources",
         )
     s_type = st.radio(
