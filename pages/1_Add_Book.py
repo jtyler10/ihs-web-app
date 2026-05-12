@@ -17,6 +17,10 @@ from search import (
     search_loc_by_author,
     search_loc_by_isbn,
     search_loc_advanced,
+    search_bl_by_title,
+    search_bl_by_author,
+    search_bl_by_isbn,
+    search_bl_advanced,
     search_internet_archive,
     get_ia_pdfs,
 )
@@ -159,8 +163,8 @@ with st.expander("Search catalogs to autofill", expanded=True):
     with src_col:
         selected_sources = st.multiselect(
             "Search in",
-            options=["Open Library", "Library of Congress"],
-            default=["Open Library", "Library of Congress"],
+            options=["Open Library", "Library of Congress", "British Library"],
+            default=["Open Library", "Library of Congress", "British Library"],
             key="s_sources",
         )
     s_type = st.radio(
@@ -230,6 +234,18 @@ with st.expander("Search catalogs to autofill", expanded=True):
                                         all_results.append(r)
                                 else:
                                     all_results += search_loc_advanced(title=qt, author=qa)
+
+                            elif source == "British Library":
+                                if s_type == "Title":
+                                    all_results += search_bl_by_title(qt)
+                                elif s_type == "Author":
+                                    all_results += search_bl_by_author(qa)
+                                elif s_type == "ISBN":
+                                    r = search_bl_by_isbn(qi)
+                                    if r:
+                                        all_results.append(r)
+                                else:
+                                    all_results += search_bl_advanced(title=qt, author=qa)
 
                         except Exception as src_err:
                             st.warning(f"{source} search failed: {src_err}")
