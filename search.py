@@ -301,65 +301,6 @@ def get_ia_pdfs(identifier):
     return pdfs
 
 
-# ── British Library (Z39.50) ──────────────────────────────────────────────────
-
-_BL_HOST = "z3950.bl.uk"
-_BL_PORT = 9909
-_BL_DB   = "BLAC"
-
-
-def _bl_z3950_search(pqf, limit=5):
-    from PyZ3950 import zoom
-    import pymarc, io
-
-    conn = zoom.Connection(_BL_HOST, _BL_PORT)
-    conn.databaseName = _BL_DB
-    conn.preferredRecordSyntax = "USMARC"
-    try:
-        results = conn.search(zoom.Query("PQF", pqf))
-        parsed = []
-        for i in range(min(limit, len(results))):
-            try:
-                raw = results[i].data
-                if isinstance(raw, str):
-                    raw = raw.encode("latin-1")
-                rec = next(pymarc.MARCReader(io.BytesIO(raw)))
-                r = _parse_loc_marc(rec)
-                if r:
-                    r["source"] = "British Library"
-                    parsed.append(r)
-            except Exception:
-                pass
-        return parsed
-    finally:
-        conn.close()
-
-
-def search_bl_by_title(title, limit=5):
-    return _bl_z3950_search(f'@attr 1=4 @attr 4=1 "{title}"', limit)
-
-
-def search_bl_by_author(author, limit=5):
-    return _bl_z3950_search(f'@attr 1=1003 @attr 4=1 "{author}"', limit)
-
-
-def search_bl_by_isbn(isbn):
-    isbn_clean = re.sub(r"[^0-9X]", "", isbn.upper())
-    results = _bl_z3950_search(f'@attr 1=7 "{isbn_clean}"', 1)
-    return results[0] if results else None
-
-
-def search_bl_advanced(title=None, author=None, limit=5):
-    if title and author:
-        pqf = (f'@and @attr 1=4 @attr 4=1 "{title}" '
-               f'@attr 1=1003 @attr 4=1 "{author}"')
-    elif title:
-        pqf = f'@attr 1=4 @attr 4=1 "{title}"'
-    elif author:
-        pqf = f'@attr 1=1003 @attr 4=1 "{author}"'
-    else:
-        return []
-    return _bl_z3950_search(pqf, limit)
 
 
 def search_loc_advanced(title=None, author=None, limit=5):
