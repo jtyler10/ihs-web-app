@@ -42,13 +42,21 @@ STAGES = [
 try:
     session = SessionLocal()
 
+    # Remove production rows whose book no longer exists in inventory
+    session.execute(sqlalchemy.text("""
+        DELETE FROM production
+        WHERE book_id NOT IN (SELECT id FROM inventory)
+    """))
+    session.commit()
+
     total = session.execute(sqlalchemy.text("SELECT COUNT(*) FROM inventory")).scalar() or 0
 
-    # Count books at each current production stage
+    # Count books at each current production stage (only books still in inventory)
     stage_counts = {}
     for stage in STAGES:
         count = session.execute(sqlalchemy.text("""
             SELECT COUNT(*) FROM production p
+            INNER JOIN inventory i ON i.id = p.book_id
             WHERE p.stage = :stage
             AND p.id = (
                 SELECT MAX(p2.id) FROM production p2 WHERE p2.book_id = p.book_id
